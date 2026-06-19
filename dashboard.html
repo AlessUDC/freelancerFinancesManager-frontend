@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — FinancePro</title>
+    <meta name="description" content="Panel de control de tus finanzas freelance. Visualiza ingresos, gastos y balance.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+    <!-- ══ OFFCANVAS SIDEBAR (móvil) ══ -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasSidebar" aria-labelledby="offcanvasLabel">
+        <div class="offcanvas-header" style="background:#1a1c23; border-bottom:1px solid rgba(255,255,255,0.08);">
+            <span class="text-white fw-bold" id="offcanvasLabel">
+                <i class="fas fa-wallet me-2 text-primary"></i> FinancePro
+            </span>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+            <nav class="sidebar-nav nav flex-column pt-2">
+                <a href="dashboard.html"          class="nav-link active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="pages/ingresos.html"      class="nav-link"><i class="fas fa-chart-line"></i> Ingresos</a>
+                <a href="pages/gastos.html"        class="nav-link"><i class="fas fa-shopping-cart"></i> Gastos</a>
+                <a href="pages/suscripciones.html" class="nav-link"><i class="fas fa-calendar-check"></i> Suscripciones</a>
+                <a href="pages/perfil.html"        class="nav-link"><i class="fas fa-user-circle"></i> Mi Perfil</a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- ══ LAYOUT PRINCIPAL ══ -->
+    <div id="wrapper">
+
+        <!-- Sidebar escritorio -->
+        <div id="sidebar-wrapper">
+            <div class="sidebar-heading">
+                <i class="fas fa-wallet me-2 text-primary"></i> FinancePro
+            </div>
+            <nav class="sidebar-nav nav flex-column pt-2">
+                <a href="dashboard.html"          class="nav-link active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="pages/ingresos.html"      class="nav-link"><i class="fas fa-chart-line"></i> Ingresos</a>
+                <a href="pages/gastos.html"        class="nav-link"><i class="fas fa-shopping-cart"></i> Gastos</a>
+                <a href="pages/suscripciones.html" class="nav-link"><i class="fas fa-calendar-check"></i> Suscripciones</a>
+                <a href="pages/perfil.html"        class="nav-link"><i class="fas fa-user-circle"></i> Mi Perfil</a>
+            </nav>
+        </div>
+
+        <!-- Contenido -->
+        <div id="page-content-wrapper">
+
+            <!-- Navbar top -->
+            <nav class="navbar navbar-expand navbar-light navbar-custom">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-dark d-md-none me-2 p-0" type="button"
+                            data-bs-toggle="offcanvas" data-bs-target="#offcanvasSidebar" aria-label="Menú">
+                        <i class="fas fa-bars fa-lg"></i>
+                    </button>
+                    <h5 class="m-0 fw-semibold text-secondary" id="welcomeMessage">Cargando...</h5>
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <button class="btn btn-outline-danger btn-sm" id="btnLogout">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span class="d-none d-sm-inline ms-1">Cerrar Sesión</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Contenido principal -->
+            <div class="container-fluid p-4">
+
+                <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+                    <h1 class="h3 fw-bold text-dark mb-0">Resumen Financiero</h1>
+                </div>
+
+                <!-- ── Tarjetas estadísticas ── -->
+                <div class="row g-4 mb-4">
+
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card card-stat card-income h-100 py-2">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="stat-label text-success">Total Ingresos</div>
+                                        <div class="stat-value" id="totalIngresos">$0.00</div>
+                                    </div>
+                                    <div class="icon-circle">
+                                        <i class="fas fa-arrow-up text-success"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card card-stat card-expense h-100 py-2">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="stat-label text-danger">Total Gastos</div>
+                                        <div class="stat-value" id="totalGastos">$0.00</div>
+                                    </div>
+                                    <div class="icon-circle">
+                                        <i class="fas fa-arrow-down text-danger"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card card-stat card-balance h-100 py-2">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="stat-label text-primary">Balance General</div>
+                                        <div class="stat-value" id="balance">$0.00</div>
+                                    </div>
+                                    <div class="icon-circle">
+                                        <i class="fas fa-wallet text-primary"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ── Próximas Renovaciones ── -->
+                <div class="card panel-card">
+                    <div class="card-header bg-white border-0 py-3 d-flex align-items-center justify-content-between">
+                        <h6 class="m-0 fw-bold text-primary">
+                            <i class="fas fa-calendar-alt me-2"></i> Próximas Renovaciones
+                        </h6>
+                        <a href="pages/suscripciones.html" class="btn btn-sm btn-outline-primary">Ver todas</a>
+                    </div>
+                    <div class="card-body p-0">
+
+                        <!-- Estado vacío -->
+                        <div id="noRenewals" class="text-center py-5 text-muted">
+                            <i class="fas fa-calendar-day fa-3x mb-3 opacity-25"></i>
+                            <p class="mb-2">No hay suscripciones registradas.</p>
+                            <a href="pages/suscripciones.html" class="btn btn-sm btn-primary">
+                                <i class="fas fa-plus me-1"></i> Agregar suscripción
+                            </a>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Servicio</th>
+                                        <th>Costo</th>
+                                        <th>Renovación</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="renewalsTable"></tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/dashboard.js"></script>
+</body>
+</html>
