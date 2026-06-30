@@ -2,37 +2,67 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { suscripcionesService } from '@/services/finanzasService';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: 'fas fa-tachometer-alt' },
-  { href: '/dashboard/ingresos', label: 'Ingresos', icon: 'fas fa-chart-line' },
-  { href: '/dashboard/gastos', label: 'Gastos', icon: 'fas fa-shopping-cart' },
-  { href: '/dashboard/suscripciones', label: 'Suscripciones', icon: 'fas fa-calendar-check' },
-  { href: '/dashboard/perfil', label: 'Mi Perfil', icon: 'fas fa-user-circle' },
+  { href: '/dashboard',               label: 'Dashboard',     icon: 'fas fa-th-large',      badgeKey: null },
+  { href: '/dashboard/ingresos',      label: 'Ingresos',      icon: 'fas fa-arrow-trend-up', badgeKey: null },
+  { href: '/dashboard/gastos',        label: 'Gastos',        icon: 'fas fa-receipt',        badgeKey: null },
+  { href: '/dashboard/suscripciones', label: 'Suscripciones', icon: 'fas fa-calendar-check', badgeKey: 'subs' },
+  { href: '/dashboard/perfil',        label: 'Mi Perfil',     icon: 'fas fa-user-circle',    badgeKey: null },
+  { href: '/dashboard/configuracion', label: 'Configuración', icon: 'fas fa-sliders-h',      badgeKey: null },
 ];
 
-function NavLinks({ onClose }: { onClose?: () => void }) {
+function NavLinks({ collapsed, onClose }: { collapsed?: boolean; onClose?: () => void }) {
   const pathname = usePathname();
+  const [alertCount, setAlertCount] = useState(0);
+
+  useEffect(() => {
+    const proximas = suscripcionesService.proximasRenovaciones(7);
+    setAlertCount(proximas.length);
+  }, []);
 
   return (
-    <nav className="flex flex-col pt-2">
+    <nav className="flex flex-col pt-3 gap-0.5 px-2">
       {navItems.map((item) => {
         const isActive =
-          item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href);
+          item.href === '/dashboard'
+            ? pathname === '/dashboard'
+            : pathname.startsWith(item.href);
+        const showBadge = item.badgeKey === 'subs' && alertCount > 0;
+
         return (
           <Link
             key={item.href}
             href={item.href}
             onClick={onClose}
-            className={`flex items-center gap-3 px-6 py-3.5 text-sm font-medium border-l-[3px] transition-all duration-200
-              ${
-                isActive
-                  ? 'bg-[rgba(78,115,223,0.15)] text-white border-l-[#4e73df]'
-                  : 'text-[rgba(255,255,255,0.65)] border-l-transparent hover:bg-[rgba(255,255,255,0.07)] hover:text-white'
-              }`}
+            title={collapsed ? item.label : undefined}
+            className={`
+              flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+              transition-all duration-200 relative group
+              ${collapsed ? 'justify-center' : ''}
+              ${isActive
+                ? 'bg-[#4e73df] text-white shadow-sm shadow-blue-500/30'
+                : 'text-[rgba(255,255,255,0.6)] hover:bg-white/8 hover:text-white'
+              }
+            `}
           >
-            <i className={`${item.icon} w-5 text-center`}></i>
-            {item.label}
+            <i
+              className={`${item.icon} w-4 text-center text-sm shrink-0
+                ${isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80'}`}
+            />
+            {!collapsed && (
+              <span className="flex-1 whitespace-nowrap">{item.label}</span>
+            )}
+            {showBadge && !collapsed && (
+              <span className="bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center min-w-[18px] h-[18px] px-1">
+                {alertCount}
+              </span>
+            )}
+            {showBadge && collapsed && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
+            )}
           </Link>
         );
       })}
@@ -41,49 +71,78 @@ function NavLinks({ onClose }: { onClose?: () => void }) {
 }
 
 /* ── Desktop Sidebar ── */
-export function Sidebar() {
+export function Sidebar({ collapsed }: { collapsed: boolean }) {
   return (
-    <aside className="hidden md:flex flex-col w-[250px] min-w-[250px] min-h-screen bg-[#1a1c23] flex-shrink-0">
-      <div className="px-6 py-5 font-bold text-white uppercase tracking-widest text-sm border-b border-white/[0.08]">
-        <i className="fas fa-wallet me-2 text-[#4e73df]"></i> FinancePro
+    <aside
+      className={`
+        hidden md:flex flex-col min-h-screen bg-[#1a1c23] flex-shrink-0
+        border-r border-white/[0.05] transition-all duration-300
+        ${collapsed ? 'w-[64px] min-w-[64px]' : 'w-[240px] min-w-[240px]'}
+      `}
+    >
+      {/* Logo */}
+      <div className={`py-5 border-b border-white/[0.07] ${collapsed ? 'px-3' : 'px-5'}`}>
+        <div className={`flex items-center gap-2.5 ${collapsed ? 'justify-center' : ''}`}>
+          <div className="w-8 h-8 rounded-xl bg-[#4e73df] flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
+            <i className="fas fa-wallet text-white text-sm" />
+          </div>
+          {!collapsed && (
+            <div>
+              <p className="text-white font-bold text-sm tracking-wide">FinancePro</p>
+              <p className="text-white/30 text-[10px] uppercase tracking-widest font-medium">Freelancer</p>
+            </div>
+          )}
+        </div>
       </div>
-      <NavLinks />
+
+      <div className="flex-1 py-2 overflow-y-auto overflow-x-hidden">
+        <NavLinks collapsed={collapsed} />
+      </div>
+
+      {/* Footer */}
+      <div className={`py-4 border-t border-white/[0.07] ${collapsed ? 'px-3 flex justify-center' : 'px-4'}`}>
+        {collapsed ? (
+          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+        ) : (
+          <div className="flex items-center gap-2 px-1">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-white/30 text-xs">v1.0 — MVP</span>
+          </div>
+        )}
+      </div>
     </aside>
   );
 }
 
-/* ── Mobile Drawer ── */
-export function MobileDrawer({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+/* ── Mobile Drawer (unchanged behaviour) ── */
+export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
       />
-      {/* Drawer */}
       <aside
-        className={`fixed top-0 left-0 h-full w-[260px] bg-[#1a1c23] z-50 md:hidden transform transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-full w-[240px] bg-[#1a1c23] z-50 md:hidden transform transition-transform duration-300 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
-          <span className="font-bold text-white text-sm uppercase tracking-widest">
-            <i className="fas fa-wallet me-2 text-[#4e73df]"></i> FinancePro
-          </span>
-          <button onClick={onClose} className="text-white/60 hover:text-white transition" aria-label="Cerrar menú">
-            <i className="fas fa-times text-lg"></i>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-[#4e73df] flex items-center justify-center">
+              <i className="fas fa-wallet text-white text-xs" />
+            </div>
+            <span className="font-bold text-white text-sm">FinancePro</span>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition p-1" aria-label="Cerrar menú">
+            <i className="fas fa-times" />
           </button>
         </div>
-        <NavLinks onClose={onClose} />
+        <div className="py-2">
+          <NavLinks onClose={onClose} />
+        </div>
       </aside>
     </>
   );

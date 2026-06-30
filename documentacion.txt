@@ -1,0 +1,78 @@
+INTRODUCCIÓN
+VISIÓN GENERAL DEL PROYECTO
+El presente proyecto consiste en el diseño e implementación de una aplicación web bajo el modelo de Software como Servicio (SaaS), orientada específicamente a trabajadores independientes o freelancers. La plataforma funciona como un ecosistema centralizado donde el usuario puede gestionar sus ingresos, gastos y, fundamentalmente, monitorear de forma automatizada sus suscripciones a herramientas digitales. Técnicamente, la solución se construye integrando un frontend dinámico, un backend robusto con Spring Boot y una capa de persistencia de datos profesional, siguiendo los estándares de arquitectura de software exigidos en la especialidad.
+CONTEXTO GENERAL
+En el marco de la transformación digital y el auge de la "gig economy", el trabajo independiente ha experimentado un crecimiento acelerado. Los profesionales actuales dependen de una amplia gama de herramientas digitales (software de diseño, entornos de desarrollo, almacenamiento en la nube, etc.) que operan bajo modelos de suscripción. Esta proliferación de servicios, sumada a la naturaleza variable de los ingresos de un freelancer, genera un escenario de alta complejidad para la administración financiera personal en el entorno digital contemporáneo.
+PLANTEAMIENTO DEL PROBLEMA
+Muchos trabajadores independientes enfrentan el fenómeno de la "fatiga de suscripción" y el desorden financiero debido a la falta de una herramienta que consolide su información en un solo lugar. El problema central radica en la dispersión de los datos: los gastos se pierden en estados de cuenta bancarios masivos y las fechas de renovación de herramientas críticas no son visibles de forma proactiva. Esta carencia de control conlleva a pagos innecesarios por servicios no utilizados y a una visión distorsionada de la rentabilidad real de su actividad profesional.
+IMPORTANCIA DEL PROYECTO
+La implementación de esta solución es vital porque proporciona al usuario una ventaja competitiva mediante la salud financiera. Al centralizar el control de gastos y proyectar el flujo de caja, el proyecto permite al profesional tomar decisiones informadas sobre qué herramientas son realmente rentables para su negocio. Además, desde una perspectiva académica, el desarrollo de este SaaS permite validar la integración de tecnologías modernas como Java Persistence API (JPA) y Spring Security, aplicadas a un problema real del mercado actual.
+ALCANCE
+El proyecto abarca el ciclo completo de desarrollo de una aplicación web, incluyendo:
+Frontend: Desarrollo de una interfaz responsive con HTML5, CSS3 y JavaScript para la interacción dinámica con el usuario.  
+Backend: Construcción de una API REST funcional utilizando Spring Boot para la lógica de negocio y gestión de servicios.  
+Persistencia: Diseño y modelado de una base de datos relacional gestionada a través de Spring Data JPA para el almacenamiento seguro de información financiera.  
+Seguridad: Implementación de mecanismos de autenticación y protección de endpoints para garantizar la privacidad de los datos de los usuarios.
+ANÁLISIS DE LA REALIDAD PROBLEMÁTICA
+DESCRIPCIÓN DETALLADA DEL PROBLEMA
+El problema central radica en la fragmentación de la información financiera y la opacidad de los gastos recurrentes. En el ecosistema del trabajador independiente, las suscripciones a servicios (como AWS, Adobe Creative Cloud, JetBrains o Copilot) suelen pasar inadvertidas una vez configurado el pago automático.
+
+Características: Los gastos no se consolidan en una interfaz única, lo que genera una desconexión entre el presupuesto proyectado y el saldo real.
+Causas: Falta de herramientas que integren el consumo de servicios web para el rastreo de pagos y la ausencia de alertas proactivas.
+Efectos: Pérdida de rentabilidad, "fuga" de capital en servicios infrautilizados y estrés financiero por renovaciones no planificadas.
+ANÁLISIS DE SOLUCIONES EXISTENTES
+Actualmente, los freelancers recurren a alternativas con limitaciones significativas:  
+
+Hojas de cálculo (Excel/Google Sheets): Requieren un registro manual exhaustivo, son propensas a errores humanos y carecen de dinamismo o alertas en tiempo real.
+Aplicaciones de banca tradicional: Aunque muestran el historial, no permiten categorizar específicamente el software como inversión productiva ni proyectar el costo a largo plazo.
+Gestores de suscripciones genéricas: Muchos están orientados al consumidor final (streaming, ocio) y no ofrecen la robustez técnica ni la seguridad necesaria para un perfil profesional de ingeniería.
+
+USUARIOS Y STAKEHOLDERS
+Se han identificado los siguientes actores clave para el sistema:  
+
+Freelancers y Consultores: Usuarios principales que requieren el control total de su flujo de caja y suscripciones de software.
+Administradores del Sistema: Encargados de la gestión técnica, seguridad de la API y mantenimiento de la infraestructura en Spring Boot.
+Proveedores de Servicios (SaaS externos): Entidades cuyos datos de facturación son el insumo para el análisis del sistema.
+REQUERIMIENTOS DERIVADOS DEL ANÁLISIS
+A partir del examen de la problemática, se definen los siguientes requerimientos esenciales para la solución:
+
+Tipo
+Requerimiento
+Descripción
+Funcional
+Gestión de suscripciones
+El sistema debe permitir el registro, edición y eliminación (CRUD) de suscripciones activas.
+Funcional
+Visualización Dinámica
+Interfaz que procese datos JSON para mostrar gráficos de gastos mensuales y anuales.
+No Funcional
+Seguridad y Privacidad
+Implementación de Spring Security para proteger el acceso a la información financiera sensible.
+No Funcional
+Disponibilidad y Diseño
+La aplicación debe ser responsive (Bootstrap) para su uso en múltiples dispositivos.
+
+
+OBJETIVOS
+OBJETIVO GENERAL
+Construir una aplicación web completa y escalable (SaaS) para la gestión financiera y el seguimiento de suscripciones de trabajadores independientes, proporcionando una solución óptima mediante la aplicación de técnicas de programación orientada a objetos, el patrón de arquitectura MVC y el uso de frameworks de desarrollo profesional.
+OBJETIVOS ESPECÍFICOS
+Para alcanzar la meta principal del proyecto y garantizar un desarrollo estructurado, se establecen los siguientes objetivos específicos, los cuales guiarán la implementación técnica del sistema:
+
+Implementar la interfaz de usuario: Construir interfaces web dinámicas y responsivas para el panel de control financiero utilizando HTML, CSS y JavaScript moderno, permitiendo la interacción con servicios web en un entorno frontend desacoplado.  
+Desarrollar la lógica de negocio: Desarrollar servicios backend empleando Spring Boot para procesar las operaciones financieras (CRUD de ingresos, gastos y suscripciones) y exponer servicios REST en una arquitectura cliente-servidor.  
+Gestionar el almacenamiento de datos: Implementar la persistencia de datos relacionales (usuarios, registros financieros, categorías de suscripción) utilizando Java Persistence API (JPA) y Spring Data para gestionar la información de manera eficiente mediante el mapeo objeto-relacional (ORM).  
+Asegurar e integrar el sistema: Integrar la aplicación web completa implementando mecanismos de autenticación y protección de endpoints con Spring Security, además de aplicar control de versiones y despliegue para entregar una solución funcional en un entorno real.
+FUNDAMENTOS TEÓRICOS Y TECNOLÓGICOS
+MARCO TEÓRICO
+Esta sección establece los pilares conceptuales que sustentan el funcionamiento técnico de la aplicación:
+
+Arquitectura Modelo-Vista-Controlador (MVC): Patrón de diseño fundamental que separa los datos (Modelo), la interfaz (Vista) y la lógica de control (Controlador). Su implementación permite que el sistema sea escalable y facilita el mantenimiento independiente de cada capa.  
+Servicios Web RESTful: Estilo de arquitectura utilizado para permitir que el frontend desacoplado se comunique con el backend mediante peticiones HTTP (GET, POST, PUT, DELETE), intercambiando información estructurada en formato JSON.  
+Mapeo Objeto-Relacional (ORM): Técnica basada en la especificación Java Persistence API (JPA) que permite convertir datos entre el lenguaje orientado a objetos (Java) y la base de datos relacional de manera automatizada.  
+Software as a Service (SaaS): Modelo de distribución donde el software y los datos se alojan en servidores externos, permitiendo al freelancer acceder a su gestión financiera vía web sin instalaciones locales.
+METODOLOGÍA DE DESARROLLO
+Para la ejecución de este proyecto se ha seleccionado la metodología Scrum. Esta elección se justifica por su enfoque ágil y su capacidad para gestionar requerimientos cambiantes mediante ciclos de trabajo iterativos (Sprints).
+Justificación: Permite realizar entregas funcionales de manera incremental, alineándose con las unidades del sílabo (desde el maquetado inicial hasta la seguridad final).  
+Roles y Eventos: Se definirán historias de usuario para priorizar funciones como el "Registro de suscripción" y se realizarán revisiones periódicas para asegurar que el sistema cumple con los objetivos planteados. 
+

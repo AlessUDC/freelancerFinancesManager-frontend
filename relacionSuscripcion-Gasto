@@ -1,0 +1,4 @@
+Cuando una suscripción llegue a su fecha de renovación (es decir, cuando los días
+restantes marquen 0d), el backend, al procesar el cambio de ciclo, debería inyectar
+automáticamente un registro con la categoría Tecnología/SaaS en el histórico del módulo
+de Gastos. Así, el usuario solo gestiona el ciclo aquí, y su flujo de caja se actualiza solo

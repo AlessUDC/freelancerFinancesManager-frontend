@@ -1,37 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
+
+@source "../app/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../components/**/*.{js,ts,jsx,tsx,mdx}";
 
 :root {
   --sidebar-bg: #1a1c23;
+  --sidebar-width: 256px;
   --primary: #4e73df;
+  --primary-dark: #3d5fc9;
   --success: #1cc88a;
   --danger: #e74a3b;
   --warning: #f6c23e;
+  --info: #36b9cc;
   --sidebar-text: rgba(255, 255, 255, 0.65);
   --sidebar-active-bg: rgba(78, 115, 223, 0.15);
-  --card-shadow: 0 0.15rem 1.75rem rgba(58, 59, 69, 0.1);
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.07);
+  --card-radius: 14px;
 }
 
 * {
   box-sizing: border-box;
 }
 
-body {
-  font-family: 'Inter', sans-serif;
-  background-color: #f8f9fc;
-  overflow-x: hidden;
+html {
+  font-size: 15px;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {
-  width: 6px;
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #f3f4f8;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+
+/* ── Scrollbar premium ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+.animate-fade-in     { animation: fadeIn 0.35s ease both; }
+.animate-slide-left  { animation: slideInLeft 0.3s ease both; }
+.animate-scale-in    { animation: scaleIn 0.25s ease both; }
+.animate-pulse-soft  { animation: pulse-soft 2s ease infinite; }
+
+/* Staggered children */
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 180ms; }
+.stagger > *:nth-child(5) { animation-delay: 240ms; }
+
+/* ── Card base ── */
+.fp-card {
+  background: #ffffff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  border: 1px solid rgba(0,0,0,0.04);
+}
+
+/* ── Stat card accent bars ── */
+.accent-green  { border-left: 4px solid var(--success); }
+.accent-red    { border-left: 4px solid var(--danger);  }
+.accent-blue   { border-left: 4px solid var(--primary); }
+.accent-yellow { border-left: 4px solid var(--warning); }
+
+/* ── Sidebar glow on active ── */
+.sidebar-link-active {
+  background: var(--sidebar-active-bg);
+  color: #fff;
+  border-left: 3px solid var(--primary);
+}
+
+/* ── Modal backdrop ── */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* ── Table hover ── */
+.fp-table tbody tr {
+  transition: background 0.15s ease;
+}
+.fp-table tbody tr:hover {
+  background: #f8f9ff;
+}
+
+/* ── Badge ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ── Currency chip ── */
+.currency-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f0f4ff;
+  color: #4e73df;
+  border: 1px solid #c7d5f8;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Loading skeleton ── */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Rate badge (currency conversion) ── */
+.rate-tag {
+  font-size: 10px;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 4px;
 }

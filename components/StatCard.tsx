@@ -1,25 +1,43 @@
+'use client';
+
+import { useCurrency } from '@/hooks/useCurrency';
+
 interface StatCardProps {
   label: string;
   value: string;
   icon: string;
-  accentColor: string;   // tailwind border color e.g. 'border-l-[#1cc88a]'
-  iconColor: string;     // tailwind text color e.g. 'text-[#1cc88a]'
-  labelColor?: string;
+  accentColor?: string;
+  iconColor?: string;
+  subLabel?: string;
+  trend?: number; // porcentaje positivo o negativo
 }
 
-export function StatCard({ label, value, icon, accentColor, iconColor, labelColor }: StatCardProps) {
+export function StatCard({ label, value, icon, accentColor = 'border-l-[#4e73df]', iconColor = 'text-[#4e73df]', subLabel, trend }: StatCardProps) {
+  const { loading } = useCurrency();
+
   return (
-    <div
-      className={`bg-white rounded-xl border-l-[5px] ${accentColor} shadow-[0_0.15rem_1.75rem_rgba(58,59,69,0.1)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_0.5rem_2rem_rgba(58,59,69,0.15)]`}
-    >
-      <div>
-        <p className={`text-[0.68rem] font-extrabold uppercase tracking-wider mb-1 ${labelColor ?? iconColor}`}>
-          {label}
-        </p>
-        <p className="text-2xl font-bold text-[#3d4066]">{value}</p>
-      </div>
-      <div className="w-11 h-11 rounded-full bg-[#f0f2fa] flex items-center justify-center text-lg flex-shrink-0">
-        <i className={`${icon} ${iconColor}`}></i>
+    <div className={`fp-card border-l-4 ${accentColor} px-5 py-4 animate-fade-in`}>
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 truncate">{label}</p>
+          {loading ? (
+            <div className="skeleton h-6 w-28 mt-1" />
+          ) : (
+            <p className="text-xl font-bold text-gray-800 truncate">{value}</p>
+          )}
+          {subLabel && !loading && (
+            <p className="text-xs text-gray-400 mt-0.5">{subLabel}</p>
+          )}
+          {typeof trend === 'number' && !loading && (
+            <div className={`flex items-center gap-1 mt-1.5 text-xs font-semibold ${trend >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+              <i className={`fas ${trend >= 0 ? 'fa-arrow-up' : 'fa-arrow-down'} text-[10px]`} />
+              {Math.abs(trend).toFixed(1)}% vs. mes anterior
+            </div>
+          )}
+        </div>
+        <div className={`w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center ml-3 shrink-0`}>
+          <i className={`${icon} ${iconColor} text-base`} />
+        </div>
       </div>
     </div>
   );
