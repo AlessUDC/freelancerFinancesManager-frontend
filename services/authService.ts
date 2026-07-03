@@ -1,10 +1,14 @@
 import api from '@/lib/axios';
 import { LoginPayload, RegisterPayload, UpdateUserPayload, Usuario } from '@/types';
+import { authenticateUser } from '@/lib/dummyUsers';
 
 export const authService = {
   async login(payload: LoginPayload): Promise<Usuario> {
-    const { data } = await api.post<Usuario>('/login', payload);
-    return data;
+    const user = await authenticateUser(payload.email, payload.password);
+    if (!user) {
+      throw new Error('Credenciales incorrectas');
+    }
+    return user;
   },
 
   async register(payload: RegisterPayload): Promise<void> {
