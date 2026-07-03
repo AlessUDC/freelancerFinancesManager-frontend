@@ -5,7 +5,7 @@ import { StatCard } from '@/components/StatCard';
 import { ingresosService } from '@/services/finanzasService';
 import { Ingreso, IngresoStatus, Usuario } from '@/types';
 import { MONEDAS_DISPONIBLES } from '@/lib/currency';
-import { formatLocalDate } from '@/lib/dates';
+import { formatLocalDate, isWithinTimeFilter, TimeFilter } from '@/lib/dates';
 import { useCurrency } from '@/hooks/useCurrency';
 
 const STATUS_META: Record<IngresoStatus, { label: string; color: string; dot: string }> = {
@@ -27,6 +27,7 @@ export default function IngresosPage() {
   const { fmt, convert, baseCurrency } = useCurrency();
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [filtro, setFiltro] = useState<IngresoStatus | 'TODOS'>('TODOS');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('TODOS');
   const [busqueda, setBusqueda] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -154,11 +155,20 @@ export default function IngresosPage() {
     .filter((i) => !busqueda || i.proyectoNombre.toLowerCase().includes(busqueda.toLowerCase()));
 
   // KPIs
-  const totalBruto = ingresos.reduce((s, i) => s + convert(i.montoBruto, i.moneda), 0);
-  const totalImpuestos = ingresos.reduce((s, i) => s + convert(i.montoBruto * (i.retencion / 100), i.moneda), 0);
-  const totalNeto = totalBruto - totalImpuestos;
+  const ingresosEnTiempo = ingresos.filter(i => {
+    const dateToUse = i.status === 'PAGADO' ? i.fecha : i.fechaEmision;
+    return isWithinTimeFilter(dateToUse, timeFilter);
+  });
+
+  const totalBruto = ingresosEnTiempo.reduce((s, i) => s + convert(i.montoBruto, i.moneda), 0);
+  const totalImpuestos = ingresosEnTiempo.reduce((s, i) => s + convert(i.montoBruto * (i.retencion / 100), i.moneda), 0);
+  const totalNeto = ingresosEnTiempo
+    .filter(i => i.status === 'PAGADO')
+    .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+    
   const totalPorCobrar = ingresosProcesados
-    .filter(i => i.computedStatus === 'PENDIENTE' || i.computedStatus === 'ATRASADO' || i.computedStatus === 'ESTIMADO')
+    .filter(i => (i.computedStatus === 'PENDIENTE' || i.computedStatus === 'ATRASADO' || i.computedStatus === 'ESTIMADO')
+              && isWithinTimeFilter(i.fechaVencimiento, timeFilter))
     .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
 
   return (
@@ -166,7 +176,20 @@ export default function IngresosPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Mis Ingresos</h1>
+          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            Mis Ingresos
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+              className="ml-2 text-xs font-semibold bg-white border border-gray-200 rounded-lg px-2 py-1 text-gray-600 focus:outline-none focus:border-[#4e73df]"
+            >
+              <option value="TODOS">Histórico</option>
+              <option value="DIA">Hoy</option>
+              <option value="SEMANA">Últimos 7 días</option>
+              <option value="MES">Este mes</option>
+              <option value="AÑO">Este año</option>
+            </select>
+          </h1>
           <p className="text-xs text-gray-400 mt-0.5">Registro de ganancias de proyectos · montos en {baseCurrency}</p>
         </div>
         <button
@@ -295,6 +318,12 @@ export default function IngresosPage() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                        {item.computedStatus !== 'PAGADO' && (
+                          <button onClick={() => handleStatusChange(item, 'PAGADO')}
+                            className="text-gray-400 hover:text-green-500 hover:bg-green-50 p-1.5 rounded-lg transition mr-1" title="Marcar como pagado">
+                            <i className="fas fa-check text-xs" />
+                          </button>
+                        )}
                         <button onClick={() => openEditModal(item)}
                           className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition mr-1" title="Editar">
                           <i className="fas fa-edit text-xs" />

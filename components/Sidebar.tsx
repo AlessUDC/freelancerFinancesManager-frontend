@@ -6,12 +6,12 @@ import { useEffect, useState } from 'react';
 import { suscripcionesService } from '@/services/finanzasService';
 
 const navItems = [
-  { href: '/dashboard',               label: 'Dashboard',     icon: 'fas fa-th-large',      badgeKey: null },
-  { href: '/dashboard/ingresos',      label: 'Ingresos',      icon: 'fas fa-arrow-trend-up', badgeKey: null },
-  { href: '/dashboard/gastos',        label: 'Gastos',        icon: 'fas fa-receipt',        badgeKey: null },
+  { href: '/dashboard', label: 'Dashboard', icon: 'fas fa-th-large', badgeKey: null },
+  { href: '/dashboard/ingresos', label: 'Ingresos', icon: 'fas fa-arrow-trend-up', badgeKey: null },
+  { href: '/dashboard/gastos', label: 'Gastos', icon: 'fas fa-receipt', badgeKey: null },
   { href: '/dashboard/suscripciones', label: 'Suscripciones', icon: 'fas fa-calendar-check', badgeKey: 'subs' },
-  { href: '/dashboard/perfil',        label: 'Mi Perfil',     icon: 'fas fa-user-circle',    badgeKey: null },
-  { href: '/dashboard/configuracion', label: 'Configuración', icon: 'fas fa-sliders-h',      badgeKey: null },
+  { href: '/dashboard/perfil', label: 'Mi Perfil', icon: 'fas fa-user-circle', badgeKey: null },
+  { href: '/dashboard/configuracion', label: 'Configuración', icon: 'fas fa-sliders-h', badgeKey: null },
 ];
 
 function NavLinks({ collapsed, onClose }: { collapsed?: boolean; onClose?: () => void }) {
@@ -75,8 +75,8 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   return (
     <aside
       className={`
-        hidden md:flex flex-col min-h-screen bg-[#1a1c23] flex-shrink-0
-        border-r border-white/[0.05] transition-all duration-300
+        hidden md:flex flex-col min-h-screen bg-[#1a1c23] shrink-0
+        border-r border-white/5 transition-all duration-300
         ${collapsed ? 'w-[64px] min-w-[64px]' : 'w-[240px] min-w-[240px]'}
       `}
     >
@@ -120,14 +120,12 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
     <>
       <div
         onClick={onClose}
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300 ${
-          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300 ${open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
       />
       <aside
-        className={`fixed top-0 left-0 h-full w-[240px] bg-[#1a1c23] z-50 md:hidden transform transition-transform duration-300 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed top-0 left-0 h-full w-[240px] bg-[#1a1c23] z-50 md:hidden transform transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07]">
           <div className="flex items-center gap-2.5">

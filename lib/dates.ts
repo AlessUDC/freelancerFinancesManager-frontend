@@ -81,3 +81,35 @@ export function toIsoDate(localDate: string): string {
   if (!localDate) return '';
   return new Date(`${localDate}T00:00:00`).toISOString();
 }
+
+export type TimeFilter = 'DIA' | 'SEMANA' | 'MES' | 'AÑO' | 'TODOS';
+
+/**
+ * Verifica si una fecha en string YYYY-MM-DD pertenece al filtro de tiempo respecto a hoy.
+ */
+export function isWithinTimeFilter(isoDate: string | undefined | null, filter: TimeFilter): boolean {
+  if (!isoDate) return false;
+  if (filter === 'TODOS') return true;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const target = new Date(isoDate.includes('T') ? isoDate : `${isoDate}T00:00:00Z`);
+  target.setHours(0, 0, 0, 0);
+
+  if (filter === 'DIA') {
+    return target.getTime() === today.getTime();
+  }
+  if (filter === 'SEMANA') {
+    const diff = Math.floor((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.abs(diff) <= 7;
+  }
+  if (filter === 'MES') {
+    return target.getFullYear() === today.getFullYear() && target.getMonth() === today.getMonth();
+  }
+  if (filter === 'AÑO') {
+    return target.getFullYear() === today.getFullYear();
+  }
+
+  return false;
+}

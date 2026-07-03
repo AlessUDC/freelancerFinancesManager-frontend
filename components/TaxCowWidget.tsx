@@ -24,7 +24,10 @@ export function TaxCowWidget({ totalIngresosNeto, totalGastosDeducibles, porcent
             <i className="fas fa-piggy-bank text-amber-500 text-sm" />
           </div>
           <div>
-            <h6 className="font-bold text-gray-800 text-sm">Fondo de Impuestos</h6>
+            <h6 className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+              Fondo de Impuestos
+              <i className="fas fa-info-circle text-[10px] text-gray-400 cursor-help" title="Fórmula: (Ingresos Netos - Gastos Deducibles) * Porcentaje de Retención. Es el dinero que debes reservar exclusivamente para pagar impuestos." />
+            </h6>
             <p className="text-xs text-gray-400">Tax Cow — reserva {porcentajeImpuesto}%</p>
           </div>
         </div>
@@ -88,7 +91,7 @@ export function TaxCowWidget({ totalIngresosNeto, totalGastosDeducibles, porcent
       </div>
 
       <p className="text-[10px] text-gray-400 text-center">
-        Configura el % en <span className="font-semibold text-[#4e73df]">Mi Perfil</span>
+        Configura el % en <span className="font-semibold text-[#4e73df]">Configuración</span>
       </p>
     </div>
   );

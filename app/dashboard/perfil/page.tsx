@@ -23,9 +23,9 @@ function getStrength(pw: string): StrengthLevel {
 }
 
 const STRENGTH_META: Record<StrengthLevel, { label: string; color: string; width: string }> = {
-  none:   { label: '',        color: 'bg-gray-200',  width: 'w-0' },
-  weak:   { label: 'Débil',  color: 'bg-red-400',   width: 'w-1/3' },
-  medium: { label: 'Media',  color: 'bg-amber-400', width: 'w-2/3' },
+  none: { label: '', color: 'bg-gray-200', width: 'w-0' },
+  weak: { label: 'Débil', color: 'bg-red-400', width: 'w-1/3' },
+  medium: { label: 'Media', color: 'bg-amber-400', width: 'w-2/3' },
   strong: { label: 'Fuerte', color: 'bg-green-400', width: 'w-full' },
 };
 
@@ -96,12 +96,12 @@ export default function PerfilPage() {
   const [msgFiscal, setMsgFiscal] = useState<{ text: string; ok: boolean } | null>(null);
 
   /* ── Security state ── */
-  const [pwActual, setPwActual]       = useState('');
-  const [pwNueva, setPwNueva]         = useState('');
-  const [pwConfirm, setPwConfirm]     = useState('');
-  const [show2FA, setShow2FA]         = useState(false);
-  const [savingPw, setSavingPw]       = useState(false);
-  const [msgPw, setMsgPw]             = useState<{ text: string; ok: boolean } | null>(null);
+  const [pwActual, setPwActual] = useState('');
+  const [pwNueva, setPwNueva] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [show2FA, setShow2FA] = useState(false);
+  const [savingPw, setSavingPw] = useState(false);
+  const [msgPw, setMsgPw] = useState<{ text: string; ok: boolean } | null>(null);
   const strength = getStrength(pwNueva);
 
   /* ── Danger zone ── */
@@ -190,7 +190,7 @@ export default function PerfilPage() {
 
       {/* ── Avatar hero card ─────────────────────────────────────────── */}
       <div className="fp-card overflow-hidden">
-        <div className="h-24 bg-gradient-to-r from-[#4e73df] to-[#6f8ef5]" />
+        <div className="h-24 bg-linear-to-r from-[#4e73df] to-[#6f8ef5]" />
         <div className="px-6 pb-5 -mt-10">
           <div className="w-20 h-20 rounded-2xl bg-white p-1 shadow-md mb-3 flex">
             <div className="w-full h-full rounded-xl bg-[#4e73df] flex items-center justify-center text-white text-3xl font-bold">

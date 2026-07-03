@@ -6,8 +6,9 @@ import { StatCard } from '@/components/StatCard';
 import { gastosService } from '@/services/finanzasService';
 import { Gasto, GastoCategoria } from '@/types';
 import { MONEDAS_DISPONIBLES } from '@/lib/currency';
-import { formatLocalDate } from '@/lib/dates';
+import { formatLocalDate, isWithinTimeFilter, TimeFilter, daysUntil } from '@/lib/dates';
 import { useCurrency } from '@/hooks/useCurrency';
+import { suscripcionesService } from '@/services/finanzasService';
 
 const CategoryDonut = dynamic(
   () => import('@/components/charts/CategoryDonut').then((m) => m.CategoryDonut),
@@ -53,8 +54,10 @@ export default function GastosPage() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [filtroCat, setFiltroCat] = useState<GastoCategoria | 'TODOS'>('TODOS');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('MES');
   const [busqueda, setBusqueda] = useState('');
   const [usuario, setUsuario] = useState<any>(null);
+  const [suscripciones, setSuscripciones] = useState<any[]>([]);
 
   // Form State
   const [concepto, setConcepto] = useState('');
@@ -65,7 +68,10 @@ export default function GastosPage() {
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [fecha, setFecha] = useState('');
 
-  const refresh = () => setGastos(gastosService.getAll());
+  const refresh = () => {
+    setGastos(gastosService.getAll());
+    setSuscripciones(suscripcionesService.getAll());
+  };
 
   useEffect(() => {
     refresh();
@@ -115,38 +121,49 @@ export default function GastosPage() {
     .filter((g) => filtroCat === 'TODOS' || g.categoria === filtroCat)
     .filter((g) => !busqueda || g.concepto.toLowerCase().includes(busqueda.toLowerCase()));
 
-  // 1. Gasto total mensual (del mes calendario actual en baseCurrency)
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
+  // 1. Filtrar gastos según factor tiempo
+  const gastosEnTiempo = gastos.filter((g) => isWithinTimeFilter(g.fecha, timeFilter));
 
-  const totalMensual = gastos
-    .filter((g) => {
-      if (!g.fecha) return false;
-      const d = new Date(g.fecha + 'T00:00:00');
-      return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-    })
-    .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+  const totalMensual = gastosEnTiempo.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
 
-  // 2. Impacto fiscal (dinero deducido en impuestos: deductible_expenses * tax_rate)
+  // 2. Impacto fiscal
   const taxRate = usuario?.porcentajeImpuesto || 20; // por defecto 20%
-  const totalDeducible = gastos
+  const totalDeducible = gastosEnTiempo
     .filter((g) => g.esDeducible)
     .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
   const impactoFiscal = totalDeducible * (taxRate / 100);
 
-  // 3. Fuga de suscripciones (dinero invertido en recurrentes VS únicos)
-  const totalRecurrentes = gastos
+  // 3. Fuga de suscripciones
+  const totalRecurrentes = gastosEnTiempo
     .filter((g) => g.esRecurrente)
     .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-  const totalUnicos = gastos
+  const totalUnicos = gastosEnTiempo
     .filter((g) => !g.esRecurrente)
     .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+
+  // 4. Gastos por pagar (a 30 días)
+  const gastosFuturos = gastos
+    .filter(g => g.fecha)
+    .filter(g => {
+      const d = daysUntil(g.fecha!);
+      return d > 0 && d <= 30;
+    })
+    .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+    
+  const subsFuturas = suscripciones
+    .filter(s => s.status === 'ACTIVA' && s.proximaRenovacion)
+    .filter(s => {
+      const d = daysUntil(s.proximaRenovacion);
+      return d >= 0 && d <= 30;
+    })
+    .reduce((s, sub) => s + convert(sub.monto, sub.moneda), 0);
+    
+  const gastosPorPagar30d = gastosFuturos + subsFuturas;
 
   // Data para dona
   const categoryDonutData = CATEGORIAS
     .map((c) => {
-      const sum = gastos.filter((g) => g.categoria === c).reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+      const sum = gastosEnTiempo.filter((g) => g.categoria === c).reduce((s, g) => s + convert(g.monto, g.moneda), 0);
       return { label: CATEGORIA_META[c].label, value: sum, color: CATEGORIA_META[c].donutColor };
     })
     .filter((d) => d.value > 0);
@@ -156,7 +173,20 @@ export default function GastosPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Mis Gastos</h1>
+          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            Mis Gastos
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+              className="ml-2 text-xs font-semibold bg-white border border-gray-200 rounded-lg px-2 py-1 text-gray-600 focus:outline-none focus:border-[#e74a3b]"
+            >
+              <option value="TODOS">Histórico</option>
+              <option value="DIA">Hoy</option>
+              <option value="SEMANA">Últimos 7 días</option>
+              <option value="MES">Este mes</option>
+              <option value="AÑO">Este año</option>
+            </select>
+          </h1>
           <p className="text-xs text-gray-400 mt-0.5">Control de egresos, recurrencias e impacto fiscal · montos en {baseCurrency}</p>
         </div>
         <button
@@ -171,14 +201,22 @@ export default function GastosPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Stat cards (apiladas en columna izq) */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger">
             <StatCard
-              label="Gasto Total Mensual"
+              label="Gasto Total"
               value={fmt(totalMensual)}
               icon="fas fa-calendar-alt"
               accentColor="border-l-[#e74a3b]"
               iconColor="text-[#e74a3b]"
-              subLabel="Acumulado este mes"
+              subLabel="Según filtro de tiempo"
+            />
+            <StatCard
+              label="Gastos por pagar"
+              value={fmt(gastosPorPagar30d)}
+              icon="fas fa-clock"
+              accentColor="border-l-[#4e73df]"
+              iconColor="text-[#4e73df]"
+              subLabel="Próximos 30 días"
             />
             <StatCard
               label="Impacto Fiscal"
@@ -266,7 +304,7 @@ export default function GastosPage() {
               <thead className="bg-gray-50/70 text-gray-400 uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="px-5 py-3 text-left font-semibold">Concepto</th>
-                  <th className="px-5 py-3 text-left font-semibold">Monto ({baseCurrency})</th>
+                  <th className="px-5 py-3 text-left font-semibold">Monto</th>
                   <th className="px-5 py-3 text-left font-semibold">Categoría</th>
                   <th className="px-5 py-3 text-left font-semibold">Tipo</th>
                   <th className="px-5 py-3 text-left font-semibold">Fiscal</th>
@@ -281,13 +319,9 @@ export default function GastosPage() {
                     <tr key={item.id}>
                       <td className='px-5 py-3.5'>
                         <span className='font-semibold'>{item.concepto}</span>
-                        <span className='ml-1.5 text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded'>{item.moneda}</span>
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="font-bold text-[#e74a3b]">{fmt(item.monto, item.moneda)}</span>
-                        {item.moneda !== baseCurrency && (
-                          <span className="ml-1.5 text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{item.moneda}</span>
-                        )}
                       </td>
                       <td className="px-5 py-3.5">
                         <span className={`badge ${catMeta ? catMeta.color : 'bg-gray-100 text-gray-700'}`}>

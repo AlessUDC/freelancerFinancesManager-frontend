@@ -11,7 +11,8 @@ interface CategoryDonutProps {
 }
 
 export function CategoryDonut({ data, centerLabel }: CategoryDonutProps) {
-  const hasData = data.length > 0 && data.some((d) => d.value > 0);
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const hasData = data.length > 0 && total > 0;
 
   const chartData = {
     labels: data.map((d) => d.label),
@@ -28,18 +29,10 @@ export function CategoryDonut({ data, centerLabel }: CategoryDonutProps) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    cutout: '70%',
+    cutout: '75%',
     plugins: {
       legend: {
-        position: 'right' as const,
-        labels: {
-          font: { family: 'Inter', size: 11 },
-          color: '#6B7280',
-          usePointStyle: true,
-          pointStyleWidth: 8,
-          padding: 12,
-          boxWidth: 10,
-        },
+        display: false, // Turn off native legend
       },
       tooltip: {
         backgroundColor: '#1a1c23',
@@ -49,7 +42,6 @@ export function CategoryDonut({ data, centerLabel }: CategoryDonutProps) {
         cornerRadius: 8,
         callbacks: {
           label: (ctx: any) => {
-            const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
             const val = ctx.parsed ?? 0;
             const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
             return ` ${ctx.label}: ${pct}%`;
@@ -69,15 +61,36 @@ export function CategoryDonut({ data, centerLabel }: CategoryDonutProps) {
   }
 
   return (
-    <div className="relative h-full w-full">
-      <Doughnut data={chartData} options={options} />
-      {centerLabel && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-xs font-semibold text-gray-500 text-center leading-tight px-6">
-            {centerLabel}
-          </span>
-        </div>
-      )}
+    <div className="flex flex-col sm:flex-row items-center gap-6 h-full w-full">
+      {/* Chart container */}
+      <div className="relative w-40 h-40 shrink-0">
+        <Doughnut data={chartData} options={options} />
+        {centerLabel && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-xs font-bold text-gray-700 text-center leading-tight whitespace-pre-line">
+              {centerLabel}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Custom Legend */}
+      <div className="flex-1 w-full flex flex-col justify-center gap-2">
+        {data.map((d) => {
+          const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+          return (
+            <div key={d.label} className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 truncate pr-2">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                <span className="text-gray-600 truncate" title={d.label}>{d.label}</span>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="font-bold text-gray-800">{pct}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

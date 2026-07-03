@@ -3,15 +3,13 @@
 import { useCurrency } from '@/hooks/useCurrency';
 
 interface RunwayWidgetProps {
-  balance: number;
-  gastoFijoMensual: number;
-  costoSuscripcionesMensual: number;
+  balanceGeneral: number;
+  gastoMesActual: number;
 }
 
-export function RunwayWidget({ balance, gastoFijoMensual, costoSuscripcionesMensual }: RunwayWidgetProps) {
+export function RunwayWidget({ balanceGeneral, gastoMesActual }: RunwayWidgetProps) {
   const { fmt, loading } = useCurrency();
-  const totalMensual = gastoFijoMensual + costoSuscripcionesMensual;
-  const runway = totalMensual > 0 ? balance / totalMensual : null;
+  const runway = gastoMesActual > 0 ? balanceGeneral / gastoMesActual : null;
 
   const getRunwayColor = () => {
     if (runway === null) return { bar: 'bg-gray-300', text: 'text-gray-500', bg: 'bg-gray-50' };
@@ -32,8 +30,11 @@ export function RunwayWidget({ balance, gastoFijoMensual, costoSuscripcionesMens
             <i className="fas fa-rocket text-[#4e73df] text-sm" />
           </div>
           <div>
-            <h6 className="font-bold text-gray-800 text-sm">Runway Financiero</h6>
-            <p className="text-xs text-gray-400">Tiempo sin nuevos ingresos</p>
+            <h6 className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+              Runway Financiero
+              <i className="fas fa-info-circle text-[10px] text-gray-400 cursor-help" title="Fórmula: Balance General / Gasto del Mes Actual. Indica cuántos meses puedes sobrevivir sin ingresos con tus gastos actuales." />
+            </h6>
+            <p className="text-xs text-gray-400">Meses de respaldo</p>
           </div>
         </div>
         {runway !== null && !loading && (
@@ -81,16 +82,12 @@ export function RunwayWidget({ balance, gastoFijoMensual, costoSuscripcionesMens
             </p>
             <div className="space-y-1 text-xs text-gray-600">
               <div className="flex justify-between">
-                <span>Gasto fijo mensual</span>
-                <span className="font-semibold">{loading ? '...' : fmt(gastoFijoMensual)}</span>
+                <span>Balance General</span>
+                <span className="font-semibold">{loading ? '...' : fmt(balanceGeneral)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Suscripciones activas</span>
-                <span className="font-semibold">{loading ? '...' : fmt(costoSuscripcionesMensual)}</span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-black/5">
-                <span className="font-semibold">Total mensual</span>
-                <span className="font-bold">{loading ? '...' : fmt(totalMensual)}</span>
+                <span>Gasto del Mes Actual</span>
+                <span className="font-semibold">{loading ? '...' : fmt(gastoMesActual)}</span>
               </div>
             </div>
           </>

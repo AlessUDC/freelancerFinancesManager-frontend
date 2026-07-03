@@ -6,6 +6,7 @@ import { Navbar } from '@/components/Navbar';
 import { useAuth } from '@/hooks/useAuth';
 import { CurrencyProvider } from '@/hooks/useCurrency';
 import { AppConfigProvider } from '@/hooks/useAppConfig';
+import { SubscriptionInjector } from '@/components/SubscriptionInjector';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { usuario, loading, logout } = useAuth();
@@ -37,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <AppConfigProvider>
       <CurrencyProvider>
+        <SubscriptionInjector />
         <div className="flex min-h-screen bg-[#f3f4f8]">
           {/* Desktop sidebar */}
           <Sidebar collapsed={sidebarCollapsed} />
