@@ -1,19 +1,34 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import { StatCard } from '@/components/StatCard';
-import { suscripcionesService } from '@/services/finanzasService';
+import { suscripcionesService, gastosService } from '@/services/finanzasService';
 import { Suscripcion, SuscripcionCiclo } from '@/types';
 import { MONEDAS_DISPONIBLES } from '@/lib/currency';
 import { formatLocalDate, renewalBadge } from '@/lib/dates';
 import { useCurrency } from '@/hooks/useCurrency';
+import { ConfirmModal } from '@/components/ConfirmModal';
+
+const isOverdue = (dateStr: string) => {
+  if (!dateStr) return false;
+  const d = new Date(dateStr + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d < today;
+};
 
 export default function SuscripcionesPage() {
-  const { fmt, baseCurrency } = useCurrency();
+  const { fmt, convert, baseCurrency } = useCurrency();
   const [suscripciones, setSuscripciones] = useState<Suscripcion[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [busqueda, setBusqueda] = useState('');
 
+  // Delete Modal state
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  // Form State
+  const [editId, setEditId] = useState<number | null>(null);
   const [servicio, setServicio]             = useState('');
   const [monto, setMonto]                   = useState('');
   const [moneda, setMoneda]                 = useState('USD');
@@ -24,7 +39,18 @@ export default function SuscripcionesPage() {
   useEffect(() => { refresh(); }, []);
 
   const resetForm = () => {
+    setEditId(null);
     setServicio(''); setMonto(''); setMoneda('USD'); setCiclo('MENSUAL'); setProximaRen('');
+  };
+
+  const openEditModal = (item: Suscripcion) => {
+    setEditId(item.id);
+    setServicio(item.servicio);
+    setMonto(item.monto.toString());
+    setMoneda(item.moneda);
+    setCiclo(item.ciclo);
+    setProximaRen(item.proximaRenovacion || '');
+    setModalOpen(true);
   };
 
   const handleCicloChange = (newCiclo: SuscripcionCiclo) => {
@@ -35,29 +61,64 @@ export default function SuscripcionesPage() {
     }
   };
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const c = parseFloat(monto);
     if (!servicio.trim() || isNaN(c) || c <= 0) return;
-    suscripcionesService.add({
+
+    const data = {
       servicio: servicio.trim(),
       monto: c,
       moneda,
       ciclo,
       proximaRenovacion,
-      status: 'ACTIVA',
-    });
+      status: 'ACTIVA' as const,
+    };
+
+    if (editId) {
+      suscripcionesService.update(editId, data);
+      toast.success(`Suscripción "${servicio.trim()}" actualizada ✓`);
+    } else {
+      suscripcionesService.add(data);
+      toast.success(`Suscripción "${servicio.trim()}" guardada ✓`);
+    }
+
     resetForm();
     setModalOpen(false);
     refresh();
   };
 
-  const handleDelete = (id: number) => {
-    if (!confirm('¿Eliminar esta suscripción?')) return;
-    suscripcionesService.remove(id);
+  const handlePay = (item: Suscripcion) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // 1. Add record to expenses (Gastos)
+    gastosService.add({
+      concepto: `Pago Suscripción: ${item.servicio}`,
+      monto: item.monto,
+      moneda: item.moneda,
+      categoria: 'MARKETING_SERVICIOS',
+      esDeducible: true,
+      esRecurrente: true,
+      fecha: todayStr
+    });
+
+    // 2. Advance the renewal date
+    const baseDate = item.proximaRenovacion || todayStr;
+    const nextDateStr = suscripcionesService.calcularProximaFecha(baseDate, item.ciclo);
+    suscripcionesService.update(item.id, { proximaRenovacion: nextDateStr });
+
+    toast.success(`Pago de "${item.servicio}" registrado en Gastos ✓`);
     refresh();
   };
 
+  const confirmDelete = () => {
+    if (!deleteId) return;
+    const sub = suscripciones.find(s => s.id === deleteId);
+    suscripcionesService.remove(deleteId);
+    toast.error(`Suscripción "${sub?.servicio}" eliminada`);
+    refresh();
+    setDeleteId(null);
+  };
 
   const filtered = suscripciones.filter((s) =>
     !busqueda || s.servicio.toLowerCase().includes(busqueda.toLowerCase())
@@ -65,6 +126,9 @@ export default function SuscripcionesPage() {
   const activas  = filtered.filter((s) => s.status === 'ACTIVA');
   const totalMensual = suscripcionesService.costoMensualActivo();
   const costoAnualProyectado = totalMensual * 12;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const vencidas = activas.filter(s => s.proximaRenovacion && s.proximaRenovacion < todayStr);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -76,7 +140,7 @@ export default function SuscripcionesPage() {
         </div>
         <button
           id="btnNuevaSuscripcion"
-          onClick={() => setModalOpen(true)}
+          onClick={() => { resetForm(); setModalOpen(true); }}
           className="flex items-center gap-2 bg-[#4e73df] hover:bg-[#3d5fc9] text-white font-semibold px-4 py-2.5 rounded-xl shadow-sm shadow-blue-500/20 transition-all text-sm"
         >
           <i className="fas fa-plus" /> Nueva Suscripción
@@ -84,13 +148,19 @@ export default function SuscripcionesPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 stagger">
         <StatCard label="Costo Mensual Estimado" value={fmt(totalMensual)}
           icon="fas fa-redo-alt" accentColor="border-l-[#4e73df]" iconColor="text-[#4e73df]" />
         <StatCard label="Costo Anual Proyectado" value={fmt(costoAnualProyectado)}
           icon="fas fa-chart-line" accentColor="border-l-[#f6c23e]" iconColor="text-[#f6c23e]" />
         <StatCard label="Suscripciones Activas" value={`${activas.length}`}
           icon="fas fa-check-circle" accentColor="border-l-[#1cc88a]" iconColor="text-[#1cc88a]" />
+        <StatCard label="Por Pagar / Vencidas" value={`${vencidas.length}`}
+          icon="fas fa-exclamation-triangle" 
+          accentColor="border-l-[#e74a3b]" 
+          iconColor="text-[#e74a3b]" 
+          subLabel={vencidas.length > 0 ? "Requiere acción inmediata" : "Todo al día"}
+        />
       </div>
 
       {/* Búsqueda */}
@@ -117,24 +187,32 @@ export default function SuscripcionesPage() {
             <p className="text-sm">No hay suscripciones registradas.</p>
           </div>
         ) : (
-          <SuscripcionesTable rows={activas} onDelete={handleDelete} onEdit={() => alert('Modo de edición en desarrollo')} fmt={fmt} baseCurrency={baseCurrency} />
+          <SuscripcionesTable
+            rows={activas}
+            onDelete={(id) => setDeleteId(id)}
+            onEdit={openEditModal}
+            onPay={handlePay}
+            fmt={fmt}
+            baseCurrency={baseCurrency}
+          />
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal — Create / Edit */}
       {modalOpen && (
         <div className="fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                <i className="fas fa-plus-circle text-[#4e73df]" /> Nueva Suscripción
+                <i className={`fas ${editId ? 'fa-edit text-blue-500' : 'fa-plus-circle text-[#4e73df]'}`} />
+                {editId ? 'Editar Suscripción' : 'Nueva Suscripción'}
               </h5>
               <button onClick={() => { setModalOpen(false); resetForm(); }}
                 className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition">
                 <i className="fas fa-times" />
               </button>
             </div>
-            <form onSubmit={handleAdd} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
               <div>
                 <label htmlFor="inputServicio" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Servicio</label>
                 <input id="inputServicio" type="text" required value={servicio} onChange={(e) => setServicio(e.target.value)}
@@ -157,6 +235,14 @@ export default function SuscripcionesPage() {
                   </select>
                 </div>
               </div>
+
+              {/* Muestra visual de la equivalencia */}
+              {moneda !== baseCurrency && (
+                <p className="text-xs font-semibold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
+                  <i className="fas fa-info-circle mr-1" />
+                  Equivalente: <span className="font-bold underline">{fmt(parseFloat(monto) || 0, moneda)}</span> en {baseCurrency}
+                </p>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Ciclo de facturación</label>
@@ -186,13 +272,27 @@ export default function SuscripcionesPage() {
               </div>
 
               <button type="submit"
-                className="w-full py-3 rounded-xl bg-[#4e73df] hover:bg-[#3d5fc9] text-white font-bold transition flex items-center justify-center gap-2 text-sm">
-                <i className="fas fa-check" /> Guardar Suscripción
+                className={`w-full py-3 rounded-xl text-white font-bold transition flex items-center justify-center gap-2 text-sm ${
+                  editId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-[#4e73df] hover:bg-[#3d5fc9]'
+                }`}>
+                <i className={`fas ${editId ? 'fa-save' : 'fa-check'}`} />
+                {editId ? 'Guardar Cambios' : 'Guardar Suscripción'}
               </button>
             </form>
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Eliminar Suscripción"
+        message="¿Estás seguro de que deseas eliminar esta suscripción? Esto no cancela el servicio real con el proveedor, solo lo remueve de tu control."
+        confirmText="Eliminar"
+        intent="danger"
+      />
     </div>
   );
 }
@@ -202,12 +302,14 @@ function SuscripcionesTable({
   rows,
   onDelete,
   onEdit,
+  onPay,
   fmt,
   baseCurrency,
 }: {
   rows: Suscripcion[];
   onDelete: (id: number) => void;
-  onEdit: (id: number) => void;
+  onEdit: (item: Suscripcion) => void;
+  onPay: (item: Suscripcion) => void;
   fmt: (amount: number, from?: string) => string;
   baseCurrency: string;
 }) {
@@ -220,15 +322,24 @@ function SuscripcionesTable({
             <th className="px-5 py-3 text-left font-semibold">Costo ({baseCurrency})</th>
             <th className="px-5 py-3 text-left font-semibold">Ciclo</th>
             <th className="px-5 py-3 text-left font-semibold">Renovación</th>
-            <th className="px-5 py-3 text-left font-semibold">Acciones</th>
+            <th className="px-5 py-3 text-right font-semibold">Acciones</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
           {rows.map((item) => {
             const badge = item.proximaRenovacion ? renewalBadge(item.proximaRenovacion) : null;
+            const overdue = item.proximaRenovacion ? isOverdue(item.proximaRenovacion) : false;
+
             return (
-              <tr key={item.id}>
-                <td className="px-5 py-3.5 font-semibold text-gray-800">{item.servicio}</td>
+              <tr key={item.id} className={overdue ? 'bg-red-50/20' : ''}>
+                <td className="px-5 py-3.5 font-semibold text-gray-800 flex items-center gap-2">
+                  {item.servicio}
+                  {overdue && (
+                    <span className="badge bg-red-100 text-red-700 border border-red-200 text-[9px] animate-pulse">
+                      ¡Vencido!
+                    </span>
+                  )}
+                </td>
                 <td className="px-5 py-3.5">
                   <span className="font-bold text-[#e74a3b]">{fmt(item.monto, item.moneda)}</span>
                 </td>
@@ -240,14 +351,27 @@ function SuscripcionesTable({
                 <td className="px-5 py-3.5 text-gray-500 text-xs">
                   {item.proximaRenovacion ? (
                     <>
-                      {formatLocalDate(item.proximaRenovacion)}
+                      <span className={overdue ? 'text-red-600 font-bold' : ''}>
+                        {formatLocalDate(item.proximaRenovacion)}
+                      </span>
                       {badge && <span className={`ml-2 badge ${badge.color}`}>{badge.label}</span>}
                     </>
                   ) : '—'}
                 </td>
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => onEdit(item.id)} title="Editar"
+                <td className="px-5 py-3.5 text-right">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => onPay(item)}
+                      title="Registrar Pago"
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1 ${
+                        overdue
+                          ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-500/10'
+                          : 'bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-sm shadow-green-500/10'
+                      }`}
+                    >
+                      <i className="fas fa-credit-card text-[10px]" /> Pagar
+                    </button>
+                    <button onClick={() => onEdit(item)} title="Editar"
                       className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition">
                       <i className="fas fa-pencil-alt text-[10px]" />
                     </button>

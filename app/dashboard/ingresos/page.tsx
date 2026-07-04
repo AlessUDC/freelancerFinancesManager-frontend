@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import { StatCard } from '@/components/StatCard';
 import { ingresosService } from '@/services/finanzasService';
 import { Ingreso, IngresoStatus, Usuario } from '@/types';
 import { MONEDAS_DISPONIBLES } from '@/lib/currency';
 import { formatLocalDate, isWithinTimeFilter, TimeFilter } from '@/lib/dates';
 import { useCurrency } from '@/hooks/useCurrency';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 const STATUS_META: Record<IngresoStatus, { label: string; color: string; dot: string }> = {
   ESTIMADO: { label: 'Estimado', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-400' },
@@ -30,6 +32,7 @@ export default function IngresosPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('TODOS');
   const [busqueda, setBusqueda] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const [usuario, setUsuario] = useState<Usuario | null>(null);
 
@@ -86,8 +89,10 @@ export default function IngresosPage() {
 
     if (editId) {
       ingresosService.update(editId, data);
+      toast.success(`Ingreso "${proyectoNombre.trim()}" actualizado ✓`);
     } else {
       ingresosService.add(data);
+      toast.success(`Ingreso "${proyectoNombre.trim()}" guardado ✓`);
     }
 
     resetForm();
@@ -120,10 +125,13 @@ export default function IngresosPage() {
     setModalOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (!confirm('¿Eliminar este ingreso?')) return;
-    ingresosService.remove(id);
+  const confirmDelete = () => {
+    if (!deleteId) return;
+    const item = ingresos.find(i => i.id === deleteId);
+    ingresosService.remove(deleteId);
+    toast.error(`Ingreso "${item?.proyectoNombre}" eliminado`);
     refresh();
+    setDeleteId(null);
   };
 
   const handleStatusChange = (item: Ingreso, newStatus: IngresoStatus) => {
@@ -133,6 +141,7 @@ export default function IngresosPage() {
       return;
     }
     ingresosService.updateStatus(item.id, newStatus);
+    toast.success(`Estado actualizado a "${newStatus}" ✓`);
     refresh();
   };
 
@@ -328,7 +337,7 @@ export default function IngresosPage() {
                           className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition mr-1" title="Editar">
                           <i className="fas fa-edit text-xs" />
                         </button>
-                        <button onClick={() => handleDelete(item.id)}
+                        <button onClick={() => setDeleteId(item.id)}
                           className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Eliminar">
                           <i className="fas fa-trash-alt text-xs" />
                         </button>
@@ -380,9 +389,17 @@ export default function IngresosPage() {
               </div>
 
               {parseFloat(montoBruto) > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex justify-between items-center">
-                  <span className="text-xs text-green-700 font-medium">Monto Neto (lo que recibes)</span>
-                  <span className="font-bold text-green-700">{moneda} {montoNeto.toFixed(2)}</span>
+                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-green-700 font-medium">Monto Neto (lo que recibes)</span>
+                    <span className="font-bold text-green-700">{moneda} {montoNeto.toFixed(2)}</span>
+                  </div>
+                  {moneda !== baseCurrency && (
+                    <div className="text-[10px] text-green-600 font-semibold bg-green-100/50 rounded p-1 flex justify-between items-center mt-1">
+                      <span>Equivalente aproximado:</span>
+                      <span>{fmt(montoNeto, moneda)} {baseCurrency}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -436,6 +453,16 @@ export default function IngresosPage() {
           </div>
         </div>
       )}
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Eliminar Ingreso"
+        message="¿Estás seguro de que deseas eliminar este ingreso? Tu balance general e impuestos calculados se verán afectados."
+        confirmText="Eliminar"
+        intent="danger"
+      />
     </div>
   );
 }

@@ -54,9 +54,11 @@ export interface Ingreso {
 // ── Gastos ───────────────────────────────────────────────────
 export type GastoCategoria =
   | 'TECNOLOGIA_SAAS'
-  | 'EQUIPAMIENTO_HARDWARE'
-  | 'INFRAESTRUCTURA_OFICINA'
-  | 'MARKETING_SERVICIOS';
+  | 'SERVICIOS_PUBLICOS_CONECTIVIDAD'
+  | 'COWORKING'
+  | 'EDUCACION_CAPACITACION'
+  | 'IMPUESTOS_LEGAL'
+  | 'PERSONAL'
 
 export interface Gasto {
   id: number;
@@ -67,6 +69,7 @@ export interface Gasto {
   esDeducible: boolean;
   fecha: string;
   esRecurrente?: boolean;
+  cantidad?: number;
 }
 
 // ── Suscripciones ─────────────────────────────────────────────

@@ -1,17 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar, MobileDrawer } from '@/components/Sidebar';
 import { Navbar } from '@/components/Navbar';
 import { useAuth } from '@/hooks/useAuth';
 import { CurrencyProvider } from '@/hooks/useCurrency';
 import { AppConfigProvider } from '@/hooks/useAppConfig';
-import { SubscriptionInjector } from '@/components/SubscriptionInjector';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { usuario, loading, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(true);
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem('lsBannerDismissed');
+    if (!dismissed) setBannerDismissed(false);
+  }, []);
+
+  const dismissBanner = () => {
+    localStorage.setItem('lsBannerDismissed', '1');
+    setBannerDismissed(true);
+  };
 
   if (loading) {
     return (
@@ -38,7 +48,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <AppConfigProvider>
       <CurrencyProvider>
-        <SubscriptionInjector />
         <div className="flex min-h-screen bg-[#f3f4f8]">
           {/* Desktop sidebar */}
           <Sidebar collapsed={sidebarCollapsed} />
@@ -55,6 +64,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               userName={usuario.nombre}
               userEmail={usuario.email}
             />
+            {/* localStorage warning banner */}
+            {!bannerDismissed && (
+              <div className="mx-4 mt-3 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 animate-fade-in">
+                <i className="fas fa-info-circle mt-0.5 shrink-0 text-blue-500" />
+                <p className="flex-1">
+                  <span className="font-semibold">Tus datos se almacenan en este navegador.</span>{' '}
+                  Si limpias el caché o usas otro dispositivo, perderás tu información. Exporta tus datos regularmente.
+                </p>
+                <button
+                  onClick={dismissBanner}
+                  className="shrink-0 text-blue-400 hover:text-blue-700 transition p-0.5"
+                  aria-label="Cerrar aviso"
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+            )}
             <main className="flex-1 p-4 md:p-6 animate-fade-in">
               {children}
             </main>

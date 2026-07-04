@@ -7,10 +7,11 @@ import { StatCard } from '@/components/StatCard';
 import { RunwayWidget } from '@/components/RunwayWidget';
 import { TaxCowWidget } from '@/components/TaxCowWidget';
 import { RenewalAlert } from '@/components/RenewalAlert';
+import { toast } from 'react-toastify';
 import { ingresosService, gastosService, suscripcionesService } from '@/services/finanzasService';
 import { Suscripcion, Ingreso, Gasto } from '@/types';
 import { useCurrency } from '@/hooks/useCurrency';
-import { formatLocalDate, renewalBadge } from '@/lib/dates';
+import { formatLocalDate, renewalBadge, TimeFilter, isWithinTimeFilter } from '@/lib/dates';
 
 // Chart cargado dinámicamente (sin SSR) para evitar errores de window
 const MonthlyBarChart = dynamic(
@@ -38,19 +39,60 @@ const CAT_LABELS: Record<string, string> = {
   MARKETING_SERVICIOS: 'Marketing/Servicios',
 };
 
-function buildMonthlyData(ingresos: Ingreso[], gastos: Gasto[], convert: (a: number, from: string) => number) {
+function buildChartData(ingresos: Ingreso[], gastos: Gasto[], convert: (a: number, from: string) => number, timeFilter: TimeFilter) {
   const now = new Date();
-  return Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-    const m = d.getMonth();
-    const y = d.getFullYear();
-    const ing = ingresos
-      .filter((x) => { const fd = new Date(x.fecha || Date.now()); return fd.getMonth() === m && fd.getFullYear() === y; })
-      .reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
-    const gas = gastos
-      .filter((x) => { const fd = new Date(x.fecha || Date.now()); return fd.getMonth() === m && fd.getFullYear() === y; })
-      .reduce((s, x) => s + convert(x.monto, x.moneda), 0);
-    return { month: MESES[m], ingresos: ing, gastos: gas };
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  if (timeFilter === 'AÑO') {
+    // 12 months of the current year
+    return Array.from({ length: 12 }, (_, i) => {
+      const ing = ingresos.filter((x) => { const fd = new Date(x.fecha || Date.now()); return fd.getMonth() === i && fd.getFullYear() === currentYear; }).reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
+      const gas = gastos.filter((x) => { const fd = new Date(x.fecha || Date.now()); return fd.getMonth() === i && fd.getFullYear() === currentYear; }).reduce((s, x) => s + convert(x.monto, x.moneda), 0);
+      return { month: MESES[i], ingresos: ing, gastos: gas };
+    });
+  }
+
+  if (timeFilter === 'MES') {
+    // 4 weeks approximation
+    return Array.from({ length: 4 }, (_, i) => {
+      // Very simple approximation: 1-7, 8-14, 15-21, 22-end
+      const startDay = i * 7 + 1;
+      const endDay = i === 3 ? 31 : (i + 1) * 7;
+      
+      const ing = ingresos.filter((x) => { const fd = new Date(x.fecha || Date.now()); return fd.getMonth() === currentMonth && fd.getFullYear() === currentYear && fd.getDate() >= startDay && fd.getDate() <= endDay; }).reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
+      const gas = gastos.filter((x) => { const fd = new Date(x.fecha || Date.now()); return fd.getMonth() === currentMonth && fd.getFullYear() === currentYear && fd.getDate() >= startDay && fd.getDate() <= endDay; }).reduce((s, x) => s + convert(x.monto, x.moneda), 0);
+      return { month: `Sem ${i + 1}`, ingresos: ing, gastos: gas };
+    });
+  }
+
+  if (timeFilter === 'SEMANA') {
+    // Last 7 days
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const targetStr = formatLocalDate(d.toISOString());
+      
+      const ing = ingresos.filter((x) => formatLocalDate(x.fecha || new Date().toISOString()) === targetStr).reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
+      const gas = gastos.filter((x) => formatLocalDate(x.fecha || new Date().toISOString()) === targetStr).reduce((s, x) => s + convert(x.monto, x.moneda), 0);
+      return { month: targetStr.split(' ')[0], ingresos: ing, gastos: gas };
+    });
+  }
+
+  if (timeFilter === 'DIA') {
+    const todayStr = formatLocalDate(now.toISOString());
+    const ing = ingresos.filter((x) => formatLocalDate(x.fecha || new Date().toISOString()) === todayStr).reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
+    const gas = gastos.filter((x) => formatLocalDate(x.fecha || new Date().toISOString()) === todayStr).reduce((s, x) => s + convert(x.monto, x.moneda), 0);
+    return [{ month: 'Hoy', ingresos: ing, gastos: gas }];
+  }
+
+  // TODOS: group by year
+  const years = Array.from(new Set([...ingresos, ...gastos].map(x => new Date(x.fecha || Date.now()).getFullYear()))).sort((a,b)=>a-b);
+  if (years.length === 0) return [{ month: currentYear.toString(), ingresos: 0, gastos: 0 }];
+  return years.map(y => {
+    const ing = ingresos.filter((x) => new Date(x.fecha || Date.now()).getFullYear() === y).reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
+    const gas = gastos.filter((x) => new Date(x.fecha || Date.now()).getFullYear() === y).reduce((s, x) => s + convert(x.monto, x.moneda), 0);
+    return { month: y.toString(), ingresos: ing, gastos: gas };
   });
 }
 
@@ -71,10 +113,20 @@ function buildCategoryData(gastos: Gasto[], convert: (a: number, from: string) =
 export default function DashboardPage() {
   const { fmt, convert, baseCurrency, loading: ratesLoading } = useCurrency();
 
-  const [totalIngresos, setTotalIngresos] = useState(0);
-  const [totalGastos, setTotalGastos] = useState(0);
-  const [totalGastosHistorico, setTotalGastosHistorico] = useState(0);
-  const [totalGastosDeducibles, setTotalGastosDeducibles] = useState(0);
+  const [totalIngresosFiltrados, setTotalIngresosFiltrados] = useState(0);
+  const [totalGastosFiltrados, setTotalGastosFiltrados] = useState(0);
+  const [totalGastosDeduciblesFiltrados, setTotalGastosDeduciblesFiltrados] = useState(0);
+  
+  // Historical data for Runway
+  const [balanceHistorico, setBalanceHistorico] = useState(0);
+  const [gastoMensualActual, setGastoMensualActual] = useState(0);
+  
+  const [timeFilter, setTimeFilterState] = useState<TimeFilter>('TODOS');
+
+  const setTimeFilter = (val: TimeFilter) => {
+    setTimeFilterState(val);
+    localStorage.setItem('fp_time_filter', val);
+  };
   const [renovaciones, setRenovaciones] = useState<Suscripcion[]>([]);
   const [alertas, setAlertas] = useState<Suscripcion[]>([]);
   const [ingresosPendientes, setIngresosPendientes] = useState<Ingreso[]>([]);
@@ -83,43 +135,57 @@ export default function DashboardPage() {
   const [monthlyData, setMonthlyData] = useState<{ month: string; ingresos: number; gastos: number }[]>([]);
   const [categoryData, setCategoryData] = useState<{ label: string; value: number; color: string }[]>([]);
 
-  // Function to mark an income as paid from the dashboard
-  const handleMarkAsPaid = (id: number) => {
-    ingresosService.updateStatus(id, 'PAGADO');
-    ingresosService.update(id, { fecha: new Date().toISOString().split('T')[0] });
-    window.dispatchEvent(new Event('financeDataChanged')); // refresh trick
-    // Re-run the calculations inside useEffect by refreshing the page or extracting the logic
-    window.location.reload(); 
-  };
-
-  useEffect(() => {
+  // ── Función de carga reutilizable (evita window.location.reload) ──────
+  const loadData = () => {
     const ingresos = ingresosService.getAll();
     const gastos   = gastosService.getAll();
     const subs     = suscripcionesService.getAll();
 
-    const ing = ingresos.filter((i) => i.status === 'PAGADO').reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
-    const gasTotal = gastos.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-    
-    // Gastos del mes actual
+    // 1. Histórico global (necesario para el Runway - cuánto dinero hay realmente)
+    const ingHistorico = ingresos
+      .filter((i) => i.status === 'PAGADO')
+      .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+    const gasHistorico = gastos.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+    setBalanceHistorico(ingHistorico - gasHistorico);
+
+    // 2. Gasto mensual promedio (Runway) — promedio de los últimos 3 meses con datos
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
-    const gastosMes = gastos.filter((g) => {
-      if (!g.fecha) return false;
-      const d = new Date(g.fecha + 'T00:00:00');
-      return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-    });
 
-    const gasMes = gastosMes.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-    const gasDeducible = gastosMes.filter((g) => g.esDeducible).reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-    
-    const costoSub = subs.filter((s) => s.status === 'ACTIVA')
-      .reduce((acc, s) => acc + convert(s.ciclo === 'ANUAL' ? s.monto / 12 : s.monto, s.moneda), 0);
+    // Collect monthly totals for the last 6 months
+    const monthlyTotals: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(currentYear, currentMonth - i, 1);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      const total = gastos
+        .filter((g) => { if (!g.fecha) return false; const fd = new Date(g.fecha + 'T00:00:00'); return fd.getMonth() === m && fd.getFullYear() === y; })
+        .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+      monthlyTotals.push(total);
+    }
+    const monthsWithData = monthlyTotals.filter(t => t > 0);
+    const avgMonthlyBurn = monthsWithData.length > 0
+      ? monthsWithData.reduce((a, b) => a + b, 0) / monthsWithData.length
+      : 0;
+    setGastoMensualActual(avgMonthlyBurn);
 
-    setTotalIngresos(ing);
-    setTotalGastos(gasMes); 
-    setTotalGastosDeducibles(gasDeducible);
-    setTotalGastosHistorico(gasTotal);
+    // 3. Filtrados por el período seleccionado (para las StatCards y TaxCow)
+    const ingFiltrado = ingresos
+      .filter((i) => i.status === 'PAGADO' && isWithinTimeFilter(i.fecha, timeFilter))
+      .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+
+    const gasFiltrado = gastos
+      .filter((g) => isWithinTimeFilter(g.fecha, timeFilter))
+      .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+
+    const gasDeducibleFiltrado = gastos
+      .filter((g) => g.esDeducible && isWithinTimeFilter(g.fecha, timeFilter))
+      .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+
+    setTotalIngresosFiltrados(ingFiltrado);
+    setTotalGastosFiltrados(gasFiltrado);
+    setTotalGastosDeduciblesFiltrados(gasDeducibleFiltrado);
 
     const proxSubs = subs
       .filter((s) => s.proximaRenovacion && s.status === 'ACTIVA')
@@ -129,21 +195,24 @@ export default function DashboardPage() {
     setAlertas(suscripcionesService.proximasRenovaciones(7));
 
     // Ingresos pendientes o atrasados
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const pendientes = ingresos
       .filter(i => {
         let computedStatus = i.status;
         if (computedStatus !== 'PAGADO' && i.fechaVencimiento) {
           const v = new Date(i.fechaVencimiento + 'T00:00:00');
-          today.setHours(0,0,0,0);
-          if (v < today) computedStatus = 'ATRASADO';
+          if (v < now) computedStatus = 'ATRASADO';
         }
         return computedStatus === 'PENDIENTE' || computedStatus === 'ATRASADO';
       })
-      .slice(0, 5); // limit to 5
-    setIngresosPendientes(pendientes);
-
-    setMonthlyData(buildMonthlyData(ingresos, gastos, convert));
-    setCategoryData(buildCategoryData(gastos, convert));
+      .slice(0, 5);
+    // 4. Update charts with filtered data so they respect the time filter
+    const filteredIngresos = ingresos.filter((i) => isWithinTimeFilter(i.fecha, timeFilter));
+    const filteredGastos = gastos.filter((g) => isWithinTimeFilter(g.fecha, timeFilter));
+    
+    setMonthlyData(buildChartData(filteredIngresos, filteredGastos, convert, timeFilter));
+    setCategoryData(buildCategoryData(filteredGastos, convert));
 
     const raw = localStorage.getItem('usuario');
     if (raw) {
@@ -152,9 +221,34 @@ export default function DashboardPage() {
         if (u.porcentajeImpuesto) setPorcentajeImpuesto(u.porcentajeImpuesto);
       } catch {}
     }
-  }, [convert, baseCurrency]);
+  };
 
-  const balance = totalIngresos - totalGastosHistorico;
+  // Función para marcar ingreso como pagado — sin reload()
+  const handleMarkAsPaid = (id: number) => {
+    ingresosService.updateStatus(id, 'PAGADO');
+    ingresosService.update(id, { fecha: new Date().toISOString().split('T')[0] });
+    toast.success('Ingreso marcado como pagado ✓');
+    loadData();
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('fp_time_filter') as TimeFilter;
+    if (saved) setTimeFilterState(saved);
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [convert, baseCurrency, timeFilter]);
+
+  const balanceFiltrado = totalIngresosFiltrados - totalGastosFiltrados;
+
+  const FILTER_LABELS: Record<TimeFilter, string> = {
+    'TODOS': 'Histórico global',
+    'AÑO': 'Este año',
+    'MES': 'Este mes',
+    'SEMANA': 'Esta semana',
+    'DIA': 'Hoy',
+  };
   return (
     <div className="space-y-5">
       {/* Alertas */}
@@ -170,13 +264,26 @@ export default function DashboardPage() {
             {ratesLoading && <i className="fas fa-circle-notch fa-spin ml-1.5 text-[10px]" />}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Link href="/dashboard/ingresos" className="text-xs font-semibold border border-[#1cc88a] text-[#1cc88a] px-3 py-1.5 rounded-lg hover:bg-[#1cc88a] hover:text-white transition">
             <i className="fas fa-plus mr-1" />Ingreso
           </Link>
           <Link href="/dashboard/gastos" className="text-xs font-semibold border border-[#e74a3b] text-[#e74a3b] px-3 py-1.5 rounded-lg hover:bg-[#e74a3b] hover:text-white transition">
             <i className="fas fa-plus mr-1" />Gasto
           </Link>
+          <div className="w-px h-6 bg-gray-200 mx-1 hidden sm:block" />
+          <i className="fas fa-calendar-alt text-gray-400 text-sm ml-1" />
+          <select 
+            value={timeFilter} 
+            onChange={e => setTimeFilter(e.target.value as TimeFilter)}
+            className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#4e73df]/30 transition shadow-sm"
+          >
+            <option value="TODOS">Histórico Global</option>
+            <option value="AÑO">Este Año</option>
+            <option value="MES">Este Mes</option>
+            <option value="SEMANA">Esta Semana</option>
+            <option value="DIA">Hoy</option>
+          </select>
         </div>
       </div>
 
@@ -184,40 +291,41 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger">
         <StatCard
           label="Ingresos Cobrados"
-          value={fmt(totalIngresos)}
+          value={fmt(totalIngresosFiltrados)}
           icon="fas fa-arrow-trend-up"
-          accentColor="border-l-[#1cc88a]"
-          iconColor="text-[#1cc88a]"
-          subLabel="Solo ingresos con estado PAGADO"
+          accentColor="border-l-transparent hover:border-l-green-500"
+          iconColor="text-green-500"
+          subLabel={`Ingresos pagados en ${FILTER_LABELS[timeFilter].toLowerCase()}`}
         />
         <StatCard
-          label="Gastos del Mes"
-          value={fmt(totalGastos)}
+          label="Gastos Totales"
+          value={fmt(totalGastosFiltrados)}
           icon="fas fa-receipt"
-          accentColor="border-l-[#e74a3b]"
-          iconColor="text-[#e74a3b]"
-          subLabel="Acumulado este mes"
+          accentColor="border-l-transparent hover:border-l-red-500"
+          iconColor="text-red-500"
+          subLabel={`Gastos en ${FILTER_LABELS[timeFilter].toLowerCase()}`}
         />
         <StatCard
-          label="Balance General"
-          value={fmt(balance)}
+          label={timeFilter === 'TODOS' ? "Balance General" : "Balance del Período"}
+          value={fmt(balanceFiltrado)}
           icon="fas fa-scale-balanced"
-          accentColor={`border-l-[${balance < 0 ? '#e74a3b' : '#4e73df'}]`}
-          iconColor={balance < 0 ? 'text-[#e74a3b]' : 'text-[#4e73df]'}
-          subLabel={balance < 0 ? '⚠️ Balance negativo' : 'Ingresos − Gastos'}
+          accentColor="border-l-transparent hover:border-l-blue-500"
+          iconColor="text-blue-500"
+          subLabel="Ingresos – Gastos"
         />
       </div>
 
       {/* Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <RunwayWidget
-          balanceGeneral={balance}
-          gastoMesActual={totalGastos}
+          balanceHistorico={balanceHistorico}
+          gastoMensualPromedio={gastoMensualActual}
         />
         <TaxCowWidget 
-          totalIngresosNeto={totalIngresos} 
-          totalGastosDeducibles={totalGastosDeducibles}
-          porcentajeImpuesto={porcentajeImpuesto} 
+          totalIngresosNeto={totalIngresosFiltrados} 
+          totalGastosDeducibles={totalGastosDeduciblesFiltrados}
+          porcentajeImpuesto={porcentajeImpuesto}
+          periodLabel={FILTER_LABELS[timeFilter]}
         />
       </div>
 
@@ -232,7 +340,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h6 className="font-bold text-gray-800 text-sm">Ingresos vs Gastos</h6>
-                <p className="text-[10px] text-gray-400">Últimos 6 meses · {baseCurrency}</p>
+                <p className="text-[10px] text-gray-400">Distribución según filtro temporal · {baseCurrency}</p>
               </div>
             </div>
           </div>
@@ -255,7 +363,7 @@ export default function DashboardPage() {
           <div className="h-52">
             <CategoryDonut
               data={categoryData}
-              centerLabel={`Total\n${fmt(totalGastos)}`}
+              centerLabel={`Total\n${fmt(totalGastosFiltrados)}`}
             />
           </div>
         </div>

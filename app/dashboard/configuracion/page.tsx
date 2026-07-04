@@ -273,13 +273,6 @@ export default function ConfiguracionPage() {
             label="Alerta de renovaciones próximas"
             description="Muestra un badge en el Dashboard y en Suscripciones cuando falten menos de 7 días para una renovación."
           />
-          <Toggle
-            id="toggleInyectar"
-            checked={config.alertas.inyectarSuscripciones}
-            onChange={(v) => setAlerta('inyectarSuscripciones', v)}
-            label="Inyectar suscripciones vencidas en Gastos"
-            description="Las suscripciones que vencen se registran automáticamente en el historial de gastos del mes."
-          />
         </Section>
 
         {/* Save button */}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { toast } from 'react-toastify';
 import { StatCard } from '@/components/StatCard';
 import { gastosService } from '@/services/finanzasService';
 import { Gasto, GastoCategoria } from '@/types';
@@ -9,6 +10,7 @@ import { MONEDAS_DISPONIBLES } from '@/lib/currency';
 import { formatLocalDate, isWithinTimeFilter, TimeFilter, daysUntil } from '@/lib/dates';
 import { useCurrency } from '@/hooks/useCurrency';
 import { suscripcionesService } from '@/services/finanzasService';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 const CategoryDonut = dynamic(
   () => import('@/components/charts/CategoryDonut').then((m) => m.CategoryDonut),
@@ -17,35 +19,49 @@ const CategoryDonut = dynamic(
 
 const CATEGORIAS: GastoCategoria[] = [
   'TECNOLOGIA_SAAS',
-  'EQUIPAMIENTO_HARDWARE',
-  'INFRAESTRUCTURA_OFICINA',
-  'MARKETING_SERVICIOS',
+  'SERVICIOS_PUBLICOS_CONECTIVIDAD',
+  'COWORKING',
+  'EDUCACION_CAPACITACION',
+  'IMPUESTOS_LEGAL',
+  'PERSONAL',
 ];
 
 const CATEGORIA_META: Record<GastoCategoria, { label: string; icon: string; color: string; donutColor: string }> = {
   TECNOLOGIA_SAAS: {
-    label: 'Tecnología/SaaS',
-    icon: 'fas fa-cloud',
+    label: 'Herramientas y Saas (Tecnología)',
+    icon: '💻',
     color: 'bg-blue-100 text-blue-700',
     donutColor: '#4e73df'
   },
-  EQUIPAMIENTO_HARDWARE: {
-    label: 'Equipamiento/Hardware',
-    icon: 'fas fa-laptop',
+  SERVICIOS_PUBLICOS_CONECTIVIDAD: {
+    label: 'Servicios Públicos y Conectividad',
+    icon: '🔌',
     color: 'bg-purple-100 text-purple-700',
     donutColor: '#9b59b6'
   },
-  INFRAESTRUCTURA_OFICINA: {
-    label: 'Infraestructura/Oficina',
-    icon: 'fas fa-building',
+  COWORKING: {
+    label: 'Espacio de Trabajo y Oficina (Coworking)',
+    icon: '☕',
     color: 'bg-cyan-100 text-cyan-700',
     donutColor: '#36b9cc'
   },
-  MARKETING_SERVICIOS: {
-    label: 'Marketing/Servicios',
-    icon: 'fas fa-bullhorn',
+  EDUCACION_CAPACITACION: {
+    label: 'Educación y Capacitación',
+    icon: '📚',
     color: 'bg-red-100 text-red-700',
     donutColor: '#e74a3b'
+  },
+  IMPUESTOS_LEGAL: {
+    label: 'Impuestos y Legal',
+    icon: '💰',
+    color: 'bg-red-100 text-red-700',
+    donutColor: '#e74a3b'
+  },
+  PERSONAL: {
+    label: 'Personal',
+    icon: '🏡',
+    color: 'bg-amber-100 text-amber-700',
+    donutColor: '#f6c23e'
   },
 };
 
@@ -59,9 +75,14 @@ export default function GastosPage() {
   const [usuario, setUsuario] = useState<any>(null);
   const [suscripciones, setSuscripciones] = useState<any[]>([]);
 
+  // Delete Modal state
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
   // Form State
+  const [editId, setEditId] = useState<number | null>(null);
   const [concepto, setConcepto] = useState('');
-  const [monto, setMonto] = useState('');
+  const [montoUnitario, setMontoUnitario] = useState('');
+  const [cantidad, setCantidad] = useState(1);
   const [moneda, setMoneda] = useState('USD');
   const [categoria, setCategoria] = useState<GastoCategoria>('TECNOLOGIA_SAAS');
   const [esDeducible, setEsDeducible] = useState(true);
@@ -84,8 +105,10 @@ export default function GastosPage() {
   }, []);
 
   const resetForm = () => {
+    setEditId(null);
     setConcepto('');
-    setMonto('');
+    setMontoUnitario('');
+    setCantidad(1);
     setMoneda(baseCurrency || 'USD');
     setCategoria('TECNOLOGIA_SAAS');
     setEsDeducible(true);
@@ -93,28 +116,58 @@ export default function GastosPage() {
     setFecha('');
   };
 
-  const handleAdd = (e: React.FormEvent) => {
+  const openEditModal = (gasto: Gasto) => {
+    setEditId(gasto.id);
+    setConcepto(gasto.concepto);
+    const cant = gasto.cantidad || 1;
+    setCantidad(cant);
+    setMontoUnitario((gasto.monto / cant).toString());
+    setMoneda(gasto.moneda);
+    setCategoria(gasto.categoria);
+    setEsDeducible(gasto.esDeducible);
+    setEsRecurrente(gasto.esRecurrente || false);
+    setFecha(gasto.fecha || '');
+    setModalOpen(true);
+  };
+
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const m = parseFloat(monto);
-    if (!concepto.trim() || isNaN(m) || m <= 0) return;
-    gastosService.add({
+    const mUnitario = parseFloat(montoUnitario);
+    if (!concepto.trim() || isNaN(mUnitario) || mUnitario <= 0 || cantidad < 1) return;
+
+    const montoTotal = mUnitario * cantidad;
+
+    const data: Omit<Gasto, 'id'> = {
       concepto: concepto.trim(),
-      monto: m,
+      monto: montoTotal,
+      cantidad,
       moneda,
       categoria,
       esDeducible,
       esRecurrente,
       fecha
-    });
+    };
+
+    if (editId) {
+      gastosService.update(editId, data);
+      toast.success(`Gasto "${concepto.trim()}" actualizado ✓`);
+    } else {
+      gastosService.add(data);
+      toast.success(`Gasto "${concepto.trim()}" guardado ✓`);
+    }
+
     resetForm();
     setModalOpen(false);
     refresh();
   };
 
-  const handleDelete = (id: number) => {
-    if (!confirm('¿Eliminar este gasto?')) return;
-    gastosService.remove(id);
+  const confirmDelete = () => {
+    if (!deleteId) return;
+    const item = gastos.find(g => g.id === deleteId);
+    gastosService.remove(deleteId);
+    toast.error(`Gasto "${item?.concepto}" eliminado`);
     refresh();
+    setDeleteId(null);
   };
 
   const filtrados = gastos
@@ -149,7 +202,7 @@ export default function GastosPage() {
       return d > 0 && d <= 30;
     })
     .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-    
+
   const subsFuturas = suscripciones
     .filter(s => s.status === 'ACTIVA' && s.proximaRenovacion)
     .filter(s => {
@@ -157,7 +210,7 @@ export default function GastosPage() {
       return d >= 0 && d <= 30;
     })
     .reduce((s, sub) => s + convert(sub.monto, sub.moneda), 0);
-    
+
   const gastosPorPagar30d = gastosFuturos + subsFuturas;
 
   // Data para dona
@@ -251,7 +304,7 @@ export default function GastosPage() {
               ))}
             </div>
             <div className="relative sm:ml-auto">
-              <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+              <i className="fas fa-search absolute left-3 top-4/17 -translate-y-1/2 text-gray-400 text-xs" />
               <input
                 type="text"
                 placeholder="Buscar concepto..."
@@ -304,29 +357,34 @@ export default function GastosPage() {
               <thead className="bg-gray-50/70 text-gray-400 uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="px-5 py-3 text-left font-semibold">Concepto</th>
-                  <th className="px-5 py-3 text-left font-semibold">Monto</th>
+                  <th className="px-5 py-3 text-left font-semibold">Cantidad</th>
+                  <th className="px-5 py-3 text-left font-semibold">Monto Total</th>
                   <th className="px-5 py-3 text-left font-semibold">Categoría</th>
                   <th className="px-5 py-3 text-left font-semibold">Tipo</th>
                   <th className="px-5 py-3 text-left font-semibold">Fiscal</th>
                   <th className="px-5 py-3 text-left font-semibold">Fecha</th>
-                  <th className="px-5 py-3 w-12" />
+                  <th className="px-5 py-3 w-16" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtrados.map((item) => {
                   const catMeta = CATEGORIA_META[item.categoria];
+
                   return (
                     <tr key={item.id}>
                       <td className='px-5 py-3.5'>
                         <span className='font-semibold'>{item.concepto}</span>
+                      </td>
+                      <td className='px-5 py-3.5 text-gray-600 font-medium'>
+                        {item.cantidad || 1}
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="font-bold text-[#e74a3b]">{fmt(item.monto, item.moneda)}</span>
                       </td>
                       <td className="px-5 py-3.5">
                         <span className={`badge ${catMeta ? catMeta.color : 'bg-gray-100 text-gray-700'}`}>
-                          <i className={`${catMeta ? catMeta.icon : 'fas fa-receipt'} mr-1 text-[10px]`} />
-                          {catMeta ? catMeta.label : item.categoria}
+                          {catMeta ? catMeta.icon : ''}
+                          {catMeta ? catMeta.label : catMeta}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
@@ -350,10 +408,16 @@ export default function GastosPage() {
                         {item.fecha ? formatLocalDate(item.fecha) : '—'}
                       </td>
                       <td className="px-5 py-3.5">
-                        <button onClick={() => handleDelete(item.id)}
-                          className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Eliminar">
-                          <i className="fas fa-trash-alt text-xs" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEditModal(item)}
+                            className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Editar">
+                            <i className="fas fa-edit text-xs" />
+                          </button>
+                          <button onClick={() => setDeleteId(item.id)}
+                            className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Eliminar">
+                            <i className="fas fa-trash-alt text-xs" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -364,20 +428,20 @@ export default function GastosPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal Form */}
       {modalOpen && (
         <div className="fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
               <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                <i className="fas fa-plus-circle text-[#e74a3b]" /> Nuevo Gasto
+                <i className={`fas ${editId ? 'fa-edit' : 'fa-plus-circle'} text-[#e74a3b]`} /> {editId ? 'Editar Gasto' : 'Nuevo Gasto'}
               </h5>
               <button onClick={() => { setModalOpen(false); resetForm(); }}
                 className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition">
                 <i className="fas fa-times" />
               </button>
             </div>
-            <form onSubmit={handleAdd} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
               <div>
                 <label htmlFor="inputConcepto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Concepto</label>
                 <input id="inputConcepto" type="text" required value={concepto} onChange={(e) => setConcepto(e.target.value)}
@@ -385,10 +449,15 @@ export default function GastosPage() {
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label htmlFor="inputMonto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Monto</label>
-                  <input id="inputMonto" type="number" required min="0.01" step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)}
+                  <label htmlFor="inputCantidad" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Cantidad</label>
+                  <input id="inputCantidad" type="number" required min="1" step="1" value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
+                </div>
+                <div>
+                  <label htmlFor="inputMonto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Monto Unit.</label>
+                  <input id="inputMonto" type="number" required min="0.01" step="0.01" value={montoUnitario} onChange={(e) => setMontoUnitario(e.target.value)}
                     placeholder="0.00"
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
                 </div>
@@ -400,6 +469,20 @@ export default function GastosPage() {
                   </select>
                 </div>
               </div>
+
+              {/* Muestra visual de la equivalencia */}
+              {moneda !== baseCurrency && (
+                <p className="text-xs font-semibold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
+                  <i className="fas fa-info-circle mr-1" />
+                  Monto Total: {cantidad} x {moneda} {parseFloat(montoUnitario) || 0} = <span className="font-bold underline">{fmt(cantidad * (parseFloat(montoUnitario) || 0), moneda)}</span> equivalentes en {baseCurrency}
+                </p>
+              )}
+
+              {moneda === baseCurrency && (
+                <p className="text-xs font-medium text-gray-500 px-1">
+                  Monto Total: <span className="font-semibold text-gray-700">{moneda} {(cantidad * (parseFloat(montoUnitario) || 0)).toFixed(2)}</span>
+                </p>
+              )}
 
               <div>
                 <label htmlFor="inputCategoria" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Categoría</label>
@@ -458,6 +541,17 @@ export default function GastosPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Eliminar Gasto"
+        message="¿Estás seguro que deseas eliminar este gasto de tu historial? Esta acción no se puede deshacer y afectará tu balance e impuestos."
+        confirmText="Eliminar"
+        intent="danger"
+      />
     </div>
   );
 }

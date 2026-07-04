@@ -60,6 +60,12 @@ export const gastosService = {
   remove(id: number): void {
     gastosService.save(gastosService.getAll().filter((g) => g.id !== id));
   },
+  update(id: number, data: Partial<Omit<Gasto, 'id'>>): void {
+    const list = gastosService.getAll().map((g) =>
+      g.id === id ? { ...g, ...data } : g
+    );
+    gastosService.save(list);
+  },
   total(): number {
     return gastosService.getAll().reduce((s, g) => s + g.monto, 0);
   },
@@ -95,6 +101,13 @@ export const suscripcionesService = {
   remove(id: number): void {
     suscripcionesService.save(suscripcionesService.getAll().filter((s) => s.id !== id));
   },
+  update(id: number, data: Partial<Omit<Suscripcion, 'id'>>): void {
+    const list = suscripcionesService.getAll().map((s) =>
+      s.id === id ? { ...s, ...data } : s
+    );
+    suscripcionesService.save(list);
+  },
+
   toggleStatus(id: number): void {
     const list = suscripcionesService.getAll().map((s) =>
       s.id === id ? { ...s, status: s.status === 'ACTIVA' ? 'PAUSADA' : 'ACTIVA' } as Suscripcion : s
