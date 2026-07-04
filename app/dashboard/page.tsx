@@ -27,16 +27,20 @@ const CategoryDonut = dynamic(
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const CAT_COLORS: Record<string, string> = {
   TECNOLOGIA_SAAS: '#4e73df',
-  EQUIPAMIENTO_HARDWARE: '#9b59b6',
-  INFRAESTRUCTURA_OFICINA: '#36b9cc',
-  MARKETING_SERVICIOS: '#e74a3b',
+  SERVICIOS_PUBLICOS_CONECTIVIDAD: '#9b59b6',
+  COWORKING: '#36b9cc',
+  EDUCACION_CAPACITACION: '#e74a3b',
+  IMPUESTOS_LEGAL: '#f6c23e',
+  PERSONAL: '#858796',
 };
 
 const CAT_LABELS: Record<string, string> = {
-  TECNOLOGIA_SAAS: 'Tecnología/SaaS',
-  EQUIPAMIENTO_HARDWARE: 'Equipamiento/Hardware',
-  INFRAESTRUCTURA_OFICINA: 'Infraestructura/Oficina',
-  MARKETING_SERVICIOS: 'Marketing/Servicios',
+  TECNOLOGIA_SAAS: 'Herramientas y Saas (Tecnología)',
+  SERVICIOS_PUBLICOS_CONECTIVIDAD: 'Servicios Públicos y Conectividad',
+  COWORKING: 'Espacio de Trabajo y Oficina (Coworking)',
+  EDUCACION_CAPACITACION: 'Educación y Capacitación',
+  IMPUESTOS_LEGAL: 'Impuestos y Legal',
+  PERSONAL: 'Personal',
 };
 
 function buildChartData(ingresos: Ingreso[], gastos: Gasto[], convert: (a: number, from: string) => number, timeFilter: TimeFilter) {
@@ -59,7 +63,7 @@ function buildChartData(ingresos: Ingreso[], gastos: Gasto[], convert: (a: numbe
       // Very simple approximation: 1-7, 8-14, 15-21, 22-end
       const startDay = i * 7 + 1;
       const endDay = i === 3 ? 31 : (i + 1) * 7;
-      
+
       const ing = ingresos.filter((x) => { const fd = new Date(x.fecha || Date.now()); return fd.getMonth() === currentMonth && fd.getFullYear() === currentYear && fd.getDate() >= startDay && fd.getDate() <= endDay; }).reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
       const gas = gastos.filter((x) => { const fd = new Date(x.fecha || Date.now()); return fd.getMonth() === currentMonth && fd.getFullYear() === currentYear && fd.getDate() >= startDay && fd.getDate() <= endDay; }).reduce((s, x) => s + convert(x.monto, x.moneda), 0);
       return { month: `Sem ${i + 1}`, ingresos: ing, gastos: gas };
@@ -72,7 +76,7 @@ function buildChartData(ingresos: Ingreso[], gastos: Gasto[], convert: (a: numbe
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
       const targetStr = formatLocalDate(d.toISOString());
-      
+
       const ing = ingresos.filter((x) => formatLocalDate(x.fecha || new Date().toISOString()) === targetStr).reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
       const gas = gastos.filter((x) => formatLocalDate(x.fecha || new Date().toISOString()) === targetStr).reduce((s, x) => s + convert(x.monto, x.moneda), 0);
       return { month: targetStr.split(' ')[0], ingresos: ing, gastos: gas };
@@ -87,7 +91,7 @@ function buildChartData(ingresos: Ingreso[], gastos: Gasto[], convert: (a: numbe
   }
 
   // TODOS: group by year
-  const years = Array.from(new Set([...ingresos, ...gastos].map(x => new Date(x.fecha || Date.now()).getFullYear()))).sort((a,b)=>a-b);
+  const years = Array.from(new Set([...ingresos, ...gastos].map(x => new Date(x.fecha || Date.now()).getFullYear()))).sort((a, b) => a - b);
   if (years.length === 0) return [{ month: currentYear.toString(), ingresos: 0, gastos: 0 }];
   return years.map(y => {
     const ing = ingresos.filter((x) => new Date(x.fecha || Date.now()).getFullYear() === y).reduce((s, x) => s + convert(x.montoNeto, x.moneda), 0);
@@ -102,10 +106,10 @@ function buildCategoryData(gastos: Gasto[], convert: (a: number, from: string) =
     map[g.categoria] = (map[g.categoria] || 0) + convert(g.monto, g.moneda);
   });
   return Object.entries(map)
-    .map(([label, value]) => ({ 
-      label: CAT_LABELS[label] || label, 
-      value, 
-      color: CAT_COLORS[label] || '#9CA3AF' 
+    .map(([label, value]) => ({
+      label: CAT_LABELS[label] || label,
+      value,
+      color: CAT_COLORS[label] || '#9CA3AF'
     }))
     .sort((a, b) => b.value - a.value);
 }
@@ -116,11 +120,11 @@ export default function DashboardPage() {
   const [totalIngresosFiltrados, setTotalIngresosFiltrados] = useState(0);
   const [totalGastosFiltrados, setTotalGastosFiltrados] = useState(0);
   const [totalGastosDeduciblesFiltrados, setTotalGastosDeduciblesFiltrados] = useState(0);
-  
+
   // Historical data for Runway
   const [balanceHistorico, setBalanceHistorico] = useState(0);
   const [gastoMensualActual, setGastoMensualActual] = useState(0);
-  
+
   const [timeFilter, setTimeFilterState] = useState<TimeFilter>('TODOS');
 
   const setTimeFilter = (val: TimeFilter) => {
@@ -138,8 +142,8 @@ export default function DashboardPage() {
   // ── Función de carga reutilizable (evita window.location.reload) ──────
   const loadData = () => {
     const ingresos = ingresosService.getAll();
-    const gastos   = gastosService.getAll();
-    const subs     = suscripcionesService.getAll();
+    const gastos = gastosService.getAll();
+    const subs = suscripcionesService.getAll();
 
     // 1. Histórico global (necesario para el Runway - cuánto dinero hay realmente)
     const ingHistorico = ingresos
@@ -210,7 +214,7 @@ export default function DashboardPage() {
     // 4. Update charts with filtered data so they respect the time filter
     const filteredIngresos = ingresos.filter((i) => isWithinTimeFilter(i.fecha, timeFilter));
     const filteredGastos = gastos.filter((g) => isWithinTimeFilter(g.fecha, timeFilter));
-    
+
     setMonthlyData(buildChartData(filteredIngresos, filteredGastos, convert, timeFilter));
     setCategoryData(buildCategoryData(filteredGastos, convert));
 
@@ -219,7 +223,7 @@ export default function DashboardPage() {
       try {
         const u = JSON.parse(raw);
         if (u.porcentajeImpuesto) setPorcentajeImpuesto(u.porcentajeImpuesto);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -273,8 +277,8 @@ export default function DashboardPage() {
           </Link>
           <div className="w-px h-6 bg-gray-200 mx-1 hidden sm:block" />
           <i className="fas fa-calendar-alt text-gray-400 text-sm ml-1" />
-          <select 
-            value={timeFilter} 
+          <select
+            value={timeFilter}
             onChange={e => setTimeFilter(e.target.value as TimeFilter)}
             className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#4e73df]/30 transition shadow-sm"
           >
@@ -321,8 +325,8 @@ export default function DashboardPage() {
           balanceHistorico={balanceHistorico}
           gastoMensualPromedio={gastoMensualActual}
         />
-        <TaxCowWidget 
-          totalIngresosNeto={totalIngresosFiltrados} 
+        <TaxCowWidget
+          totalIngresosNeto={totalIngresosFiltrados}
           totalGastosDeducibles={totalGastosDeduciblesFiltrados}
           porcentajeImpuesto={porcentajeImpuesto}
           periodLabel={FILTER_LABELS[timeFilter]}
@@ -475,11 +479,11 @@ export default function DashboardPage() {
                 {ingresosPendientes.map((i) => {
                   let statusLabel = 'Pendiente';
                   let statusColor = 'bg-blue-100 text-blue-700';
-                  
+
                   if (i.fechaVencimiento) {
                     const v = new Date(i.fechaVencimiento + 'T00:00:00');
                     const today = new Date();
-                    today.setHours(0,0,0,0);
+                    today.setHours(0, 0, 0, 0);
                     if (v < today) {
                       statusLabel = 'Atrasado';
                       statusColor = 'bg-red-100 text-red-700';
@@ -497,7 +501,7 @@ export default function DashboardPage() {
                         <span className={`ml-2 badge ${statusColor}`}>{statusLabel}</span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <button 
+                        <button
                           onClick={() => handleMarkAsPaid(i.id)}
                           className="flex items-center gap-1.5 text-xs font-semibold bg-[#1cc88a] text-white px-3 py-1.5 rounded-lg hover:bg-[#17a874] transition"
                         >

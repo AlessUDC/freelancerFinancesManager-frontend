@@ -29,11 +29,11 @@ export default function SuscripcionesPage() {
 
   // Form State
   const [editId, setEditId] = useState<number | null>(null);
-  const [servicio, setServicio]             = useState('');
-  const [monto, setMonto]                   = useState('');
-  const [moneda, setMoneda]                 = useState('USD');
-  const [ciclo, setCiclo]                   = useState<SuscripcionCiclo>('MENSUAL');
-  const [proximaRenovacion, setProximaRen]  = useState('');
+  const [servicio, setServicio] = useState('');
+  const [monto, setMonto] = useState('');
+  const [moneda, setMoneda] = useState('USD');
+  const [ciclo, setCiclo] = useState<SuscripcionCiclo>('MENSUAL');
+  const [proximaRenovacion, setProximaRen] = useState('');
 
   const refresh = () => setSuscripciones(suscripcionesService.getAll());
   useEffect(() => { refresh(); }, []);
@@ -90,13 +90,13 @@ export default function SuscripcionesPage() {
 
   const handlePay = (item: Suscripcion) => {
     const todayStr = new Date().toISOString().split('T')[0];
-    
+
     // 1. Add record to expenses (Gastos)
     gastosService.add({
       concepto: `Pago Suscripción: ${item.servicio}`,
       monto: item.monto,
       moneda: item.moneda,
-      categoria: 'MARKETING_SERVICIOS',
+      categoria: 'TECNOLOGIA_SAAS',
       esDeducible: true,
       esRecurrente: true,
       fecha: todayStr
@@ -123,7 +123,7 @@ export default function SuscripcionesPage() {
   const filtered = suscripciones.filter((s) =>
     !busqueda || s.servicio.toLowerCase().includes(busqueda.toLowerCase())
   );
-  const activas  = filtered.filter((s) => s.status === 'ACTIVA');
+  const activas = filtered.filter((s) => s.status === 'ACTIVA');
   const totalMensual = suscripcionesService.costoMensualActivo();
   const costoAnualProyectado = totalMensual * 12;
 
@@ -156,9 +156,9 @@ export default function SuscripcionesPage() {
         <StatCard label="Suscripciones Activas" value={`${activas.length}`}
           icon="fas fa-check-circle" accentColor="border-l-[#1cc88a]" iconColor="text-[#1cc88a]" />
         <StatCard label="Por Pagar / Vencidas" value={`${vencidas.length}`}
-          icon="fas fa-exclamation-triangle" 
-          accentColor="border-l-[#e74a3b]" 
-          iconColor="text-[#e74a3b]" 
+          icon="fas fa-exclamation-triangle"
+          accentColor="border-l-[#e74a3b]"
+          iconColor="text-[#e74a3b]"
           subLabel={vencidas.length > 0 ? "Requiere acción inmediata" : "Todo al día"}
         />
       </div>
@@ -249,11 +249,10 @@ export default function SuscripcionesPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {(['MENSUAL', 'ANUAL'] as SuscripcionCiclo[]).map((c) => (
                     <button key={c} type="button" onClick={() => handleCicloChange(c)}
-                      className={`py-2.5 rounded-xl text-sm font-semibold border transition ${
-                        ciclo === c
+                      className={`py-2.5 rounded-xl text-sm font-semibold border transition ${ciclo === c
                           ? 'bg-[#4e73df] text-white border-[#4e73df] shadow-sm'
                           : 'bg-white text-gray-600 border-gray-200 hover:border-[#4e73df]'
-                      }`}>
+                        }`}>
                       {c === 'MENSUAL' ? '📅 Mensual' : '🗓️ Anual'}
                     </button>
                   ))}
@@ -272,9 +271,8 @@ export default function SuscripcionesPage() {
               </div>
 
               <button type="submit"
-                className={`w-full py-3 rounded-xl text-white font-bold transition flex items-center justify-center gap-2 text-sm ${
-                  editId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-[#4e73df] hover:bg-[#3d5fc9]'
-                }`}>
+                className={`w-full py-3 rounded-xl text-white font-bold transition flex items-center justify-center gap-2 text-sm ${editId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-[#4e73df] hover:bg-[#3d5fc9]'
+                  }`}>
                 <i className={`fas ${editId ? 'fa-save' : 'fa-check'}`} />
                 {editId ? 'Guardar Cambios' : 'Guardar Suscripción'}
               </button>
@@ -363,11 +361,10 @@ function SuscripcionesTable({
                     <button
                       onClick={() => onPay(item)}
                       title="Registrar Pago"
-                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1 ${
-                        overdue
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1 ${overdue
                           ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-500/10'
                           : 'bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-sm shadow-green-500/10'
-                      }`}
+                        }`}
                     >
                       <i className="fas fa-credit-card text-[10px]" /> Pagar
                     </button>
