@@ -148,7 +148,7 @@ export default function SuscripcionesPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 stagger">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 stagger">
         <StatCard label="Costo Mensual Estimado" value={fmt(totalMensual)}
           icon="fas fa-redo-alt" accentColor="border-l-[#4e73df]" iconColor="text-[#4e73df]" />
         <StatCard label="Costo Anual Proyectado" value={fmt(costoAnualProyectado)}
@@ -250,8 +250,8 @@ export default function SuscripcionesPage() {
                   {(['MENSUAL', 'ANUAL'] as SuscripcionCiclo[]).map((c) => (
                     <button key={c} type="button" onClick={() => handleCicloChange(c)}
                       className={`py-2.5 rounded-xl text-sm font-semibold border transition ${ciclo === c
-                          ? 'bg-[#4e73df] text-white border-[#4e73df] shadow-sm'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-[#4e73df]'
+                        ? 'bg-[#4e73df] text-white border-[#4e73df] shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-[#4e73df]'
                         }`}>
                       {c === 'MENSUAL' ? '📅 Mensual' : '🗓️ Anual'}
                     </button>
@@ -311,6 +311,8 @@ function SuscripcionesTable({
   fmt: (amount: number, from?: string) => string;
   baseCurrency: string;
 }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm fp-table">
@@ -327,6 +329,7 @@ function SuscripcionesTable({
           {rows.map((item) => {
             const badge = item.proximaRenovacion ? renewalBadge(item.proximaRenovacion) : null;
             const overdue = item.proximaRenovacion ? isOverdue(item.proximaRenovacion) : false;
+            const isPaid = !!(item.proximaRenovacion && item.proximaRenovacion > todayStr);
 
             return (
               <tr key={item.id} className={overdue ? 'bg-red-50/20' : ''}>
@@ -359,14 +362,17 @@ function SuscripcionesTable({
                 <td className="px-5 py-3.5 text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     <button
-                      onClick={() => onPay(item)}
-                      title="Registrar Pago"
-                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1 ${overdue
+                      onClick={() => !isPaid && onPay(item)}
+                      disabled={isPaid}
+                      title={isPaid ? "Ya pagado para este periodo" : "Registrar Pago"}
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1 ${isPaid
+                        ? 'bg-gray-400 text-white border-gray-400 opacity-50 cursor-not-allowed'
+                        : overdue
                           ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-500/10'
                           : 'bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-sm shadow-green-500/10'
                         }`}
                     >
-                      <i className="fas fa-credit-card text-[10px]" /> Pagar
+                      <i className="fas fa-credit-card text-[10px]" /> {isPaid ? 'Pagado' : 'Pagar'}
                     </button>
                     <button onClick={() => onEdit(item)} title="Editar"
                       className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition">

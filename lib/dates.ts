@@ -14,8 +14,8 @@ export function formatLocalDate(
   options: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' }
 ): string {
   if (!isoDate) return '—';
-  // Si ya viene como YYYY-MM-DD (sin hora), parseamos como medianoche UTC
-  const normalized = isoDate.includes('T') ? isoDate : `${isoDate}T00:00:00Z`;
+  // Si ya viene como YYYY-MM-DD (sin hora), parseamos como fecha local
+  const normalized = isoDate.includes('T') ? isoDate : `${isoDate}T00:00:00`;
   return new Intl.DateTimeFormat(locale, {
     ...options,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -59,7 +59,7 @@ export function nextRenewalDate(from: Date, ciclo: 'MENSUAL' | 'ANUAL'): Date {
 export function daysUntil(isoDate: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const target = new Date(isoDate.includes('T') ? isoDate : `${isoDate}T00:00:00Z`);
+  const target = new Date(isoDate.includes('T') ? isoDate : `${isoDate}T00:00:00`);
   target.setHours(0, 0, 0, 0);
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -94,7 +94,7 @@ export function isWithinTimeFilter(isoDate: string | undefined | null, filter: T
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const target = new Date(isoDate.includes('T') ? isoDate : `${isoDate}T00:00:00Z`);
+  const target = new Date(isoDate.includes('T') ? isoDate : `${isoDate}T00:00:00`);
   target.setHours(0, 0, 0, 0);
 
   if (filter === 'DIA') {

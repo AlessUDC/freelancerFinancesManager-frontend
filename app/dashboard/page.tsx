@@ -11,6 +11,7 @@ import { toast } from 'react-toastify';
 import { ingresosService, gastosService, suscripcionesService } from '@/services/finanzasService';
 import { Suscripcion, Ingreso, Gasto } from '@/types';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { formatLocalDate, renewalBadge, TimeFilter, isWithinTimeFilter } from '@/lib/dates';
 
 // Chart cargado dinámicamente (sin SSR) para evitar errores de window
@@ -26,12 +27,12 @@ const CategoryDonut = dynamic(
 /* ── helpers ── */
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const CAT_COLORS: Record<string, string> = {
-  TECNOLOGIA_SAAS: '#4e73df',
-  SERVICIOS_PUBLICOS_CONECTIVIDAD: '#9b59b6',
-  COWORKING: '#36b9cc',
-  EDUCACION_CAPACITACION: '#e74a3b',
-  IMPUESTOS_LEGAL: '#f6c23e',
-  PERSONAL: '#858796',
+  TECNOLOGIA_SAAS: '#2563EB',
+  SERVICIOS_PUBLICOS_CONECTIVIDAD: '#0EA5A4',
+  COWORKING: '#F59E0B',
+  EDUCACION_CAPACITACION: '#8B5CF6',
+  IMPUESTOS_LEGAL: '#DC2626',
+  PERSONAL: '#7488A3',
 };
 
 const CAT_LABELS: Record<string, string> = {
@@ -116,6 +117,7 @@ function buildCategoryData(gastos: Gasto[], convert: (a: number, from: string) =
 
 export default function DashboardPage() {
   const { fmt, convert, baseCurrency, loading: ratesLoading } = useCurrency();
+  const { config } = useAppConfig();
 
   const [totalIngresosFiltrados, setTotalIngresosFiltrados] = useState(0);
   const [totalGastosFiltrados, setTotalGastosFiltrados] = useState(0);
@@ -152,12 +154,12 @@ export default function DashboardPage() {
     const gasHistorico = gastos.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
     setBalanceHistorico(ingHistorico - gasHistorico);
 
-    // 2. Gasto mensual promedio (Runway) — promedio de los últimos 3 meses con datos
+    // 2. Gasto mensual promedio (Runway) — promedio de los últimos 6 meses + costo fijo de suscripciones
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
 
-    // Collect monthly totals for the last 6 months
+    // Collect monthly totals for the last 6 months (gastos registrados)
     const monthlyTotals: number[] = [];
     for (let i = 0; i < 6; i++) {
       const d = new Date(currentYear, currentMonth - i, 1);
@@ -169,9 +171,14 @@ export default function DashboardPage() {
       monthlyTotals.push(total);
     }
     const monthsWithData = monthlyTotals.filter(t => t > 0);
-    const avgMonthlyBurn = monthsWithData.length > 0
+    const avgHistoricBurn = monthsWithData.length > 0
       ? monthsWithData.reduce((a, b) => a + b, 0) / monthsWithData.length
       : 0;
+    // Añadir costo mensual de suscripciones activas (convertido a moneda base)
+    const costoSubsMensual = subs
+      .filter((s) => s.status === 'ACTIVA')
+      .reduce((sum, s) => sum + convert(s.ciclo === 'ANUAL' ? s.monto / 12 : s.monto, s.moneda), 0);
+    const avgMonthlyBurn = avgHistoricBurn + costoSubsMensual;
     setGastoMensualActual(avgMonthlyBurn);
 
     // 3. Filtrados por el período seleccionado (para las StatCards y TaxCow)
@@ -253,10 +260,95 @@ export default function DashboardPage() {
     'SEMANA': 'Esta semana',
     'DIA': 'Hoy',
   };
+  // ── Metas y límites (mensuales por definición en config) ──
+  const now = new Date();
+  const gastosEsteMes = gastosService.getAll()
+    .filter((g) => {
+      if (!g.fecha) return false;
+      const fd = new Date(g.fecha + 'T00:00:00');
+      return fd.getMonth() === now.getMonth() && fd.getFullYear() === now.getFullYear();
+    })
+    .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+
+  const ingresosEsteMes = ingresosService.getAll()
+    .filter((i) => {
+      if (!i.fecha) return false;
+      const fd = new Date(i.fecha + 'T00:00:00');
+      return i.status === 'PAGADO' && fd.getMonth() === now.getMonth() && fd.getFullYear() === now.getFullYear();
+    })
+    .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+
+  const gastosSuperanLimite = config.limiteGastos > 0 && gastosEsteMes > config.limiteGastos;
+  const progresoMeta = config.metaIngresoMensual > 0
+    ? Math.min((ingresosEsteMes / config.metaIngresoMensual) * 100, 100)
+    : 0;
+
   return (
     <div className="space-y-5">
       {/* Alertas */}
       <RenewalAlert suscripciones={alertas} />
+
+      {/* ── Alerta de límite de gastos ── */}
+      {gastosSuperanLimite && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-300 rounded-xl px-4 py-3.5 animate-fade-in">
+          <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+            <i className="fas fa-triangle-exclamation text-red-600 text-sm" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-red-700">⚠️ Situación crítica — Límite de gastos superado</p>
+            <p className="text-xs text-red-500 mt-0.5">
+              Llevas {fmt(gastosEsteMes)} en gastos este mes, superando tu límite de{' '}
+              <span className="font-bold">{fmt(config.limiteGastos)}</span>.
+              Revisa tu módulo de gastos.
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-1 rounded-lg">
+              +{fmt(gastosEsteMes - config.limiteGastos)} sobre el límite
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Barra de progreso meta de ingresos ── */}
+      {config.metaIngresoMensual > 0 && (
+        <div className="fp-card p-4 animate-fade-in">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
+                <i className="fas fa-bullseye text-[#1cc88a] text-xs" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">Meta de Ingresos — Este mes</p>
+                <p className="text-[10px] text-gray-400">Objetivo: {fmt(config.metaIngresoMensual)}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`text-lg font-bold ${progresoMeta >= 100 ? 'text-[#1cc88a]' :
+                progresoMeta >= 60 ? 'text-amber-500' : 'text-gray-500'
+                }`}>
+                {progresoMeta.toFixed(1)}%
+              </span>
+              <p className="text-[10px] text-gray-400">{fmt(ingresosEsteMes)} cobrados</p>
+            </div>
+          </div>
+          <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${progresoMeta >= 100 ? 'bg-[#1cc88a]' :
+                progresoMeta >= 60 ? 'bg-amber-400' : 'bg-[#4e73df]'
+                }`}
+              style={{ width: `${progresoMeta}%` }}
+            />
+          </div>
+          {progresoMeta >= 100 ? (
+            <p className="text-[11px] text-[#1cc88a] font-semibold mt-1.5">🎉 ¡Meta alcanzada este mes!</p>
+          ) : (
+            <p className="text-[11px] text-gray-400 mt-1.5">
+              Faltan <span className="font-semibold text-gray-600">{fmt(config.metaIngresoMensual - ingresosEsteMes)}</span> para alcanzar tu meta.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -292,7 +384,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger">
+      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4 stagger">
         <StatCard
           label="Ingresos Cobrados"
           value={fmt(totalIngresosFiltrados)}
@@ -348,14 +440,14 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          <div className="h-52">
+          <div className="h-full max-h-100 lg:max-h-140">
             <MonthlyBarChart data={monthlyData} />
           </div>
         </div>
 
         {/* Dona de categorías */}
-        <div className="fp-card p-5">
-          <div className="flex items-center gap-2.5 mb-4">
+        <div className="fp-card p-5 h-full">
+          <div className="h-fit flex items-center gap-2.5 mb-4">
             <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
               <i className="fas fa-chart-pie text-purple-500 text-xs" />
             </div>
@@ -364,10 +456,10 @@ export default function DashboardPage() {
               <p className="text-[10px] text-gray-400">{baseCurrency}</p>
             </div>
           </div>
-          <div className="h-52">
+          <div className="h-full">
             <CategoryDonut
               data={categoryData}
-              centerLabel={`Total\n${fmt(totalGastosFiltrados)}`}
+              centerLabel={fmt(totalGastosFiltrados)}
             />
           </div>
         </div>

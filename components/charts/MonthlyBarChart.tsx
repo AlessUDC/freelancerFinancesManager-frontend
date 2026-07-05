@@ -62,10 +62,10 @@ export function MonthlyBarChart({ data }: MonthlyBarChartProps) {
       legend: {
         position: 'top' as const,
         labels: {
-          font: { family: 'Inter', size: 12 },
+          font: { family: 'Inter', size: 10 },
           color: '#6B7280',
           usePointStyle: true,
-          pointStyleWidth: 8,
+          pointStyleWidth: 14,
           padding: 16,
         },
       },

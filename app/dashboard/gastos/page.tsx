@@ -11,6 +11,7 @@ import { formatLocalDate, isWithinTimeFilter, TimeFilter, daysUntil } from '@/li
 import { useCurrency } from '@/hooks/useCurrency';
 import { suscripcionesService } from '@/services/finanzasService';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { UpcomingPaymentsTimeline } from '@/components/UpcomingPaymentsTimeline';
 
 const CategoryDonut = dynamic(
   () => import('@/components/charts/CategoryDonut').then((m) => m.CategoryDonut),
@@ -31,37 +32,37 @@ const CATEGORIA_META: Record<GastoCategoria, { label: string; icon: string; colo
     label: 'Herramientas y Saas (Tecnología)',
     icon: '💻',
     color: 'bg-blue-100 text-blue-700',
-    donutColor: '#4e73df'
+    donutColor: '#2563EB'
   },
   SERVICIOS_PUBLICOS_CONECTIVIDAD: {
     label: 'Servicios Públicos y Conectividad',
     icon: '🔌',
     color: 'bg-purple-100 text-purple-700',
-    donutColor: '#9b59b6'
+    donutColor: '#0EA5A4'
   },
   COWORKING: {
     label: 'Espacio de Trabajo y Oficina (Coworking)',
     icon: '☕',
     color: 'bg-cyan-100 text-cyan-700',
-    donutColor: '#36b9cc'
+    donutColor: '#F59E0B'
   },
   EDUCACION_CAPACITACION: {
     label: 'Educación y Capacitación',
     icon: '📚',
     color: 'bg-red-100 text-red-700',
-    donutColor: '#e74a3b'
+    donutColor: '#8B5CF6'
   },
   IMPUESTOS_LEGAL: {
     label: 'Impuestos y Legal',
     icon: '💰',
     color: 'bg-red-100 text-red-700',
-    donutColor: '#e74a3b'
+    donutColor: '#DC2626'
   },
   PERSONAL: {
     label: 'Personal',
     icon: '🏡',
     color: 'bg-amber-100 text-amber-700',
-    donutColor: '#f6c23e'
+    donutColor: '#7488A3'
   },
 };
 
@@ -73,7 +74,10 @@ export default function GastosPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('MES');
   const [busqueda, setBusqueda] = useState('');
   const [usuario, setUsuario] = useState<any>(null);
+
   const [suscripciones, setSuscripciones] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
 
   // Delete Modal state
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -217,7 +221,11 @@ export default function GastosPage() {
   const categoryDonutData = CATEGORIAS
     .map((c) => {
       const sum = gastosEnTiempo.filter((g) => g.categoria === c).reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-      return { label: CATEGORIA_META[c].label, value: sum, color: CATEGORIA_META[c].donutColor };
+      return {
+        label: CATEGORIA_META[c].label,
+        value: sum,
+        color: CATEGORIA_META[c].donutColor
+      };
     })
     .filter((d) => d.value > 0);
 
@@ -322,11 +330,22 @@ export default function GastosPage() {
             <i className="fas fa-chart-pie text-purple-500 text-sm" />
             <h6 className="font-bold text-gray-700 text-sm">Distribución de Gastos</h6>
           </div>
-          <div className="h-44">
-            <CategoryDonut data={categoryDonutData} />
+          <div className="h-full">
+            <CategoryDonut
+              data={categoryDonutData}
+              centerLabel={fmt(totalMensual)}
+            />
           </div>
         </div>
       </div>
+
+      <UpcomingPaymentsTimeline
+        gastos={gastos}
+        suscripciones={suscripciones}
+        categoriaMeta={CATEGORIA_META}
+        fmt={fmt}
+        onPagarGasto={openEditModal}
+      />
 
       {/* Tabla */}
       <div className="fp-card overflow-hidden">

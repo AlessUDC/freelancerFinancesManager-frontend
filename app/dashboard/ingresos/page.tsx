@@ -169,15 +169,14 @@ export default function IngresosPage() {
     return isWithinTimeFilter(dateToUse, timeFilter);
   });
 
-  const totalBruto = ingresosEnTiempo.reduce((s, i) => s + convert(i.montoBruto, i.moneda), 0);
-  const totalImpuestos = ingresosEnTiempo.reduce((s, i) => s + convert(i.montoBruto * (i.retencion / 100), i.moneda), 0);
-  const totalNeto = ingresosEnTiempo
-    .filter(i => i.status === 'PAGADO')
-    .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
-    
+  const ingresosEnTiempoPagados = ingresosEnTiempo.filter(i => i.status === 'PAGADO');
+  const totalBruto = ingresosEnTiempoPagados.reduce((s, i) => s + convert(i.montoBruto, i.moneda), 0);
+  const totalImpuestos = ingresosEnTiempoPagados.reduce((s, i) => s + convert(i.montoBruto * (i.retencion / 100), i.moneda), 0);
+  const totalNeto = ingresosEnTiempoPagados.reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+
   const totalPorCobrar = ingresosProcesados
     .filter(i => (i.computedStatus === 'PENDIENTE' || i.computedStatus === 'ATRASADO' || i.computedStatus === 'ESTIMADO')
-              && isWithinTimeFilter(i.fechaVencimiento, timeFilter))
+      && isWithinTimeFilter(i.fechaVencimiento, timeFilter))
     .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
 
   return (
@@ -210,7 +209,7 @@ export default function IngresosPage() {
       </div>
 
       {/* Stat cards KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 stagger">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 stagger">
         <StatCard label="Ingreso Bruto" value={fmt(totalBruto)}
           icon="fas fa-chart-line" accentColor="border-l-[#4e73df]" iconColor="text-[#4e73df]"
           subLabel="Todas las ganancias" />
@@ -439,6 +438,7 @@ export default function IngresosPage() {
                   <label htmlFor="inputFecha" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Fecha de Pago</label>
                   <input id="inputFecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
                     min={fechaEmision || undefined}
+                    max={new Date().toISOString().split('T')[0]}
                     required={status === 'PAGADO'}
                     disabled={status !== 'PAGADO'}
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#1cc88a]/30 focus:border-[#1cc88a] text-xs transition disabled:bg-gray-100 disabled:text-gray-400" />

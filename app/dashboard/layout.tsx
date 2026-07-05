@@ -48,7 +48,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <AppConfigProvider>
       <CurrencyProvider>
-        <div className="flex min-h-screen bg-[#f3f4f8]">
+        <div className="flex min-h-screen bg-[#f3f4f8] items-start">
           {/* Desktop sidebar */}
           <Sidebar collapsed={sidebarCollapsed} />
 

@@ -91,7 +91,7 @@ export function RunwayWidget({ balanceHistorico, gastoMensualPromedio }: RunwayW
               Runway Financiero
               <span
                 className="fas fa-info-circle text-[10px] text-gray-400 cursor-help"
-                title="¿Cuántos meses puedes sobrevivir sin ingresos? Se calcula dividiendo tu balance total histórico entre tu gasto mensual promedio. No cambia según el filtro de fechas."
+                title="¿Cuántos meses puedes sobrevivir sin ingresos? Se calcula dividiendo tu balance total histórico entre tu gasto mensual promedio (historial de gastos + suscripciones activas). No cambia según el filtro de fechas."
               />
             </h6>
             <p className="text-[11px] text-gray-400 leading-tight">
@@ -162,7 +162,7 @@ export function RunwayWidget({ balanceHistorico, gastoMensualPromedio }: RunwayW
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
               <span>Balance histórico</span>
               <span className="font-semibold text-right">{loading ? '…' : fmt(balanceHistorico)}</span>
-              <span>Gasto/mes promedio</span>
+              <span>Gasto/mes <span className="text-gray-400 font-normal">(incl. suscripciones)</span></span>
               <span className="font-semibold text-right">{loading ? '…' : fmt(gastoMensualPromedio)}</span>
             </div>
           </>

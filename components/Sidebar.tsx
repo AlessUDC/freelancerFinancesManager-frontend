@@ -75,7 +75,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   return (
     <aside
       className={`
-        hidden md:flex flex-col min-h-screen bg-[#1a1c23] shrink-0
+        hidden md:flex flex-col h-screen sticky top-0 bg-[#1a1c23] shrink-0
         border-r border-white/5 transition-all duration-300
         ${collapsed ? 'w-[64px] min-w-[64px]' : 'w-[240px] min-w-[240px]'}
       `}

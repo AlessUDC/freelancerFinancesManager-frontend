@@ -11,12 +11,12 @@ export interface ExchangeRates {
 
 const STATIC_RATES: Record<string, number> = {
   USD: 1.0,
-  EUR: 0.92,
-  PEN: 3.75,
-  MXN: 17.5,
-  COP: 3900.0,
-  ARS: 850.0,
-  CLP: 950.0,
+  EUR: 0.87,
+  PEN: 3.42,
+  MXN: 17.47,
+  COP: 3359.84,
+  ARS: 1492.90,
+  CLP: 925.62,
 };
 
 /**
@@ -28,6 +28,23 @@ export async function fetchRates(base = 'USD'): Promise<ExchangeRates> {
     return { base, date: '', rates: {} };
   }
 
+  try {
+    const response = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.result === 'success' && data.rates) {
+        return {
+          base: data.base_code || base,
+          date: data.time_last_update_utc || new Date().toISOString(),
+          rates: data.rates,
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching exchange rates, falling back to static rates:', error);
+  }
+
+  // Fallback to static dictionary
   const baseRate = STATIC_RATES[base] || 1.0;
   const rates: Record<string, number> = {};
 

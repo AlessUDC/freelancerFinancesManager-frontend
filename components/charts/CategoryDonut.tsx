@@ -6,12 +6,13 @@ import { useCurrency } from '@/hooks/useCurrency';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-interface CategoryDonutProps {
+export interface CategoryDonutProps {
   data: { label: string; value: number; color: string }[];
   centerLabel?: string;
 }
 
 export function CategoryDonut({ data, centerLabel }: CategoryDonutProps) {
+
   const { fmt } = useCurrency();
   const total = data.reduce((sum, d) => sum + d.value, 0);
   const hasData = data.length > 0 && total > 0;
@@ -32,7 +33,7 @@ export function CategoryDonut({ data, centerLabel }: CategoryDonutProps) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    cutout: '72%',
+    cutout: '68%',
     plugins: {
       legend: {
         display: false,
@@ -64,21 +65,21 @@ export function CategoryDonut({ data, centerLabel }: CategoryDonutProps) {
   }
 
   return (
-    <div className="flex flex-col sm:flex-row items-center gap-5 h-full w-full">
-      {/* Chart container */}
-      <div className="relative shrink-0" style={{ width: 150, height: 150 }}>
+    <div className="flex flex-col $:flex-row items-center gap-5 h-full w-full">
+      {/* Chart container - Responsivo para evitar overflow vertical en mobile */}
+      <div className="relative shrink-0 w-fit h-54 $sm:w-36 $sm:h-36">
         <Doughnut data={chartData} options={options} />
         {centerLabel && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-xs font-bold text-gray-700 text-center leading-tight whitespace-pre-line">
-              {centerLabel}
+            <span className="w-20 text-[10px] sm:text-sm font-bold text-gray-700 text-center leading-tight whitespace-pre-linep-1">
+              Total{''} {centerLabel}
             </span>
           </div>
         )}
       </div>
 
-      {/* Custom Legend — label + amount + percentage */}
-      <div className="flex-1 w-full flex flex-col justify-center gap-2.5 min-w-0">
+      {/* Custom Legend — Con scroll preventivo para pantallas pequeñas */}
+      <div className="flex-1 w-full flex flex-col gap-2.5 min-w-0 max-h-52 sm:max-h-full overflow-y-auto pr-1">
         {data.map((d) => {
           const pct = total > 0 ? ((d.value / total) * 100).toFixed(1) : '0';
           return (
