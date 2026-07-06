@@ -10,15 +10,19 @@ export function useAuth() {
   const router = useRouter();
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     const raw = localStorage.getItem('usuario');
-    if (!raw) {
+
+    if (!token || !raw) {
       router.replace('/');
+      setLoading(false);
       return;
     }
     try {
       setUsuario(JSON.parse(raw));
     } catch {
       localStorage.removeItem('usuario');
+      localStorage.removeItem('token');
       router.replace('/');
     } finally {
       setLoading(false);
@@ -27,6 +31,7 @@ export function useAuth() {
 
   const logout = () => {
     localStorage.removeItem('usuario');
+    localStorage.removeItem('token');
     router.replace('/');
   };
 

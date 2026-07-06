@@ -28,6 +28,7 @@ const FILTROS: Array<{ value: IngresoStatus | 'TODOS'; label: string }> = [
 export default function IngresosPage() {
   const { fmt, convert, baseCurrency } = useCurrency();
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<IngresoStatus | 'TODOS'>('TODOS');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('TODOS');
   const [busqueda, setBusqueda] = useState('');
@@ -38,19 +39,30 @@ export default function IngresosPage() {
 
   // Form State
   const [editId, setEditId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
   const [proyectoNombre, setProyectoNombre] = useState('');
   const [montoBruto, setMontoBruto] = useState('');
   const [retencion, setRetencion] = useState('0');
   const [moneda, setMoneda] = useState('USD');
   const [status, setStatus] = useState<IngresoStatus>('ESTIMADO');
-  const [fecha, setFecha] = useState(''); // Fecha pago
+  const [fecha, setFecha] = useState('');
   const [fechaEmision, setFechaEmision] = useState('');
   const [fechaVencimiento, setFechaVencimiento] = useState('');
 
-  const refresh = () => setIngresos(ingresosService.getAll());
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const data = await ingresosService.getAll();
+      setIngresos(data);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al cargar los ingresos');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    refresh();
     const storedUser = localStorage.getItem('usuario');
     if (storedUser) {
       try {
@@ -61,6 +73,7 @@ export default function IngresosPage() {
         }
       } catch { }
     }
+    refresh();
   }, []);
 
   const montoNeto = (() => {
@@ -69,13 +82,13 @@ export default function IngresosPage() {
     return b * (1 - r / 100);
   })();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const b = parseFloat(montoBruto);
     const r = parseFloat(retencion) || 0;
     if (!proyectoNombre.trim() || isNaN(b) || b <= 0) return;
 
-    const data = {
+    const payload = {
       proyectoNombre: proyectoNombre.trim(),
       montoBruto: b,
       retencion: r,
@@ -87,17 +100,24 @@ export default function IngresosPage() {
       fechaVencimiento,
     };
 
-    if (editId) {
-      ingresosService.update(editId, data);
-      toast.success(`Ingreso "${proyectoNombre.trim()}" actualizado ✓`);
-    } else {
-      ingresosService.add(data);
-      toast.success(`Ingreso "${proyectoNombre.trim()}" guardado ✓`);
+    setSaving(true);
+    try {
+      if (editId) {
+        await ingresosService.update(editId, payload);
+        toast.success(`Ingreso "${proyectoNombre.trim()}" actualizado ✓`);
+      } else {
+        await ingresosService.add(payload);
+        toast.success(`Ingreso "${proyectoNombre.trim()}" guardado ✓`);
+      }
+      resetForm();
+      setModalOpen(false);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al guardar el ingreso');
+    } finally {
+      setSaving(false);
     }
-
-    resetForm();
-    setModalOpen(false);
-    refresh();
   };
 
   const resetForm = () => {
@@ -125,27 +145,37 @@ export default function IngresosPage() {
     setModalOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteId) return;
     const item = ingresos.find(i => i.id === deleteId);
-    ingresosService.remove(deleteId);
-    toast.error(`Ingreso "${item?.proyectoNombre}" eliminado`);
-    refresh();
-    setDeleteId(null);
+    try {
+      await ingresosService.remove(deleteId);
+      toast.error(`Ingreso "${item?.proyectoNombre}" eliminado`);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al eliminar el ingreso');
+    } finally {
+      setDeleteId(null);
+    }
   };
 
-  const handleStatusChange = (item: Ingreso, newStatus: IngresoStatus) => {
+  const handleStatusChange = async (item: Ingreso, newStatus: IngresoStatus) => {
     if (newStatus === 'PAGADO' || item.status === 'PAGADO') {
       openEditModal(item);
       setStatus(newStatus);
       return;
     }
-    ingresosService.updateStatus(item.id, newStatus);
-    toast.success(`Estado actualizado a "${newStatus}" ✓`);
-    refresh();
+    try {
+      await ingresosService.updateStatus(item.id, newStatus);
+      toast.success(`Estado actualizado a "${newStatus}" ✓`);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al actualizar el estado');
+    }
   };
 
-  // Lógica para detectar si está retrasado dinámicamente si la fecha de vencimiento ya pasó y no está pagado
   const ingresosProcesados = ingresos.map(item => {
     let currentStatus = item.status;
     if (currentStatus !== 'PAGADO' && item.fechaVencimiento) {
@@ -163,7 +193,6 @@ export default function IngresosPage() {
     .filter((i) => filtro === 'TODOS' || i.computedStatus === filtro)
     .filter((i) => !busqueda || i.proyectoNombre.toLowerCase().includes(busqueda.toLowerCase()));
 
-  // KPIs
   const ingresosEnTiempo = ingresos.filter(i => {
     const dateToUse = i.status === 'PAGADO' ? i.fecha : i.fechaEmision;
     return isWithinTimeFilter(dateToUse, timeFilter);
@@ -262,7 +291,12 @@ export default function IngresosPage() {
           </span>
         </div>
 
-        {filtrados.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-14 text-gray-400">
+            <i className="fas fa-spinner fa-spin text-2xl mb-3 opacity-40" />
+            <p className="text-sm">Cargando ingresos...</p>
+          </div>
+        ) : filtrados.length === 0 ? (
           <div className="text-center py-14 text-gray-400">
             <i className="fas fa-inbox text-4xl mb-3 opacity-20" />
             <p className="text-sm mb-3">
@@ -445,9 +479,12 @@ export default function IngresosPage() {
                 </div>
               </div>
 
-              <button type="submit"
-                className={`w-full py-3 rounded-xl text-white font-bold transition flex items-center justify-center gap-2 text-sm ${editId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-[#1cc88a] hover:bg-[#17a874]'}`}>
-                <i className={`fas ${editId ? 'fa-save' : 'fa-check'}`} /> {editId ? 'Guardar Cambios' : 'Guardar Ingreso'}
+              <button type="submit" disabled={saving}
+                className={`w-full py-3 rounded-xl text-white font-bold transition flex items-center justify-center gap-2 text-sm ${editId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-[#1cc88a] hover:bg-[#17a874]'} disabled:opacity-60`}>
+                {saving
+                  ? <><i className="fas fa-spinner fa-spin" /> Guardando...</>
+                  : <><i className={`fas ${editId ? 'fa-save' : 'fa-check'}`} /> {editId ? 'Guardar Cambios' : 'Guardar Ingreso'}</>
+                }
               </button>
             </form>
           </div>

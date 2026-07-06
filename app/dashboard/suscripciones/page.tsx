@@ -35,7 +35,16 @@ export default function SuscripcionesPage() {
   const [ciclo, setCiclo] = useState<SuscripcionCiclo>('MENSUAL');
   const [proximaRenovacion, setProximaRen] = useState('');
 
-  const refresh = () => setSuscripciones(suscripcionesService.getAll());
+  const refresh = async () => {
+    try {
+      const data = await suscripcionesService.getAll();
+      setSuscripciones(data);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al cargar suscripciones');
+    }
+  };
+  
   useEffect(() => { refresh(); }, []);
 
   const resetForm = () => {
@@ -61,7 +70,7 @@ export default function SuscripcionesPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const c = parseFloat(monto);
     if (!servicio.trim() || isNaN(c) || c <= 0) return;
@@ -75,56 +84,70 @@ export default function SuscripcionesPage() {
       status: 'ACTIVA' as const,
     };
 
-    if (editId) {
-      suscripcionesService.update(editId, data);
-      toast.success(`Suscripción "${servicio.trim()}" actualizada ✓`);
-    } else {
-      suscripcionesService.add(data);
-      toast.success(`Suscripción "${servicio.trim()}" guardada ✓`);
+    try {
+      if (editId) {
+        await suscripcionesService.update(editId, data);
+        toast.success(`Suscripción "${servicio.trim()}" actualizada ✓`);
+      } else {
+        await suscripcionesService.add(data);
+        toast.success(`Suscripción "${servicio.trim()}" guardada ✓`);
+      }
+      resetForm();
+      setModalOpen(false);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al guardar la suscripción');
     }
-
-    resetForm();
-    setModalOpen(false);
-    refresh();
   };
 
-  const handlePay = (item: Suscripcion) => {
+  const handlePay = async (item: Suscripcion) => {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 1. Add record to expenses (Gastos)
-    gastosService.add({
-      concepto: `Pago Suscripción: ${item.servicio}`,
-      monto: item.monto,
-      moneda: item.moneda,
-      categoria: 'TECNOLOGIA_SAAS',
-      esDeducible: true,
-      esRecurrente: true,
-      fecha: todayStr
-    });
+    try {
+      // 1. Add record to expenses (Gastos)
+      await gastosService.add({
+        concepto: `Pago Suscripción: ${item.servicio}`,
+        monto: item.monto,
+        moneda: item.moneda,
+        categoria: 'TECNOLOGIA_SAAS',
+        esDeducible: true,
+        esRecurrente: true,
+        fecha: todayStr
+      });
 
-    // 2. Advance the renewal date
-    const baseDate = item.proximaRenovacion || todayStr;
-    const nextDateStr = suscripcionesService.calcularProximaFecha(baseDate, item.ciclo);
-    suscripcionesService.update(item.id, { proximaRenovacion: nextDateStr });
+      // 2. Advance the renewal date
+      const baseDate = item.proximaRenovacion || todayStr;
+      const nextDateStr = suscripcionesService.calcularProximaFecha(baseDate, item.ciclo);
+      await suscripcionesService.update(item.id, { proximaRenovacion: nextDateStr });
 
-    toast.success(`Pago de "${item.servicio}" registrado en Gastos ✓`);
-    refresh();
+      toast.success(`Pago de "${item.servicio}" registrado en Gastos ✓`);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al registrar el pago en Gastos');
+    }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteId) return;
     const sub = suscripciones.find(s => s.id === deleteId);
-    suscripcionesService.remove(deleteId);
-    toast.error(`Suscripción "${sub?.servicio}" eliminada`);
-    refresh();
-    setDeleteId(null);
+    try {
+      await suscripcionesService.remove(deleteId);
+      toast.error(`Suscripción "${sub?.servicio}" eliminada`);
+      refresh();
+      setDeleteId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al eliminar la suscripción');
+    }
   };
 
   const filtered = suscripciones.filter((s) =>
     !busqueda || s.servicio.toLowerCase().includes(busqueda.toLowerCase())
   );
   const activas = filtered.filter((s) => s.status === 'ACTIVA');
-  const totalMensual = suscripcionesService.costoMensualActivo();
+  const totalMensual = suscripcionesService.costoMensualActivo(activas);
   const costoAnualProyectado = totalMensual * 12;
 
   const todayStr = new Date().toISOString().split('T')[0];

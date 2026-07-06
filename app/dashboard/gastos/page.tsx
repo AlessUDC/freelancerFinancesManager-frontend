@@ -93,9 +93,15 @@ export default function GastosPage() {
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [fecha, setFecha] = useState('');
 
-  const refresh = () => {
-    setGastos(gastosService.getAll());
-    setSuscripciones(suscripcionesService.getAll());
+  const refresh = async () => {
+    try {
+      const data = await gastosService.getAll();
+      setGastos(data);
+      setSuscripciones(await suscripcionesService.getAll());
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al cargar gastos');
+    }
   };
 
   useEffect(() => {
@@ -134,7 +140,7 @@ export default function GastosPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const mUnitario = parseFloat(montoUnitario);
     if (!concepto.trim() || isNaN(mUnitario) || mUnitario <= 0 || cantidad < 1) return;
@@ -152,26 +158,35 @@ export default function GastosPage() {
       fecha
     };
 
-    if (editId) {
-      gastosService.update(editId, data);
-      toast.success(`Gasto "${concepto.trim()}" actualizado ✓`);
-    } else {
-      gastosService.add(data);
-      toast.success(`Gasto "${concepto.trim()}" guardado ✓`);
+    try {
+      if (editId) {
+        await gastosService.update(editId, data);
+        toast.success(`Gasto "${concepto.trim()}" actualizado ✓`);
+      } else {
+        await gastosService.add(data);
+        toast.success(`Gasto "${concepto.trim()}" guardado ✓`);
+      }
+      resetForm();
+      setModalOpen(false);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al guardar el gasto');
     }
-
-    resetForm();
-    setModalOpen(false);
-    refresh();
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteId) return;
     const item = gastos.find(g => g.id === deleteId);
-    gastosService.remove(deleteId);
-    toast.error(`Gasto "${item?.concepto}" eliminado`);
-    refresh();
-    setDeleteId(null);
+    try {
+      await gastosService.remove(deleteId);
+      toast.error(`Gasto "${item?.concepto}" eliminado`);
+      refresh();
+      setDeleteId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al eliminar el gasto');
+    }
   };
 
   const filtrados = gastos

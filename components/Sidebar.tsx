@@ -19,8 +19,16 @@ function NavLinks({ collapsed, onClose }: { collapsed?: boolean; onClose?: () =>
   const [alertCount, setAlertCount] = useState(0);
 
   useEffect(() => {
-    const proximas = suscripcionesService.proximasRenovaciones(7);
-    setAlertCount(proximas.length);
+    const fetchAlerts = async () => {
+      try {
+        const subs = await suscripcionesService.getAll();
+        const proximas = suscripcionesService.proximasRenovaciones(subs, 7);
+        setAlertCount(proximas.length);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchAlerts();
   }, []);
 
   return (

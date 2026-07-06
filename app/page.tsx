@@ -17,8 +17,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const usuario = await authService.login({ email, password });
-      localStorage.setItem('usuario', JSON.stringify(usuario));
+      await authService.login({ email, password });
       router.push('/dashboard');
     } catch (err: unknown) {
       const msg =

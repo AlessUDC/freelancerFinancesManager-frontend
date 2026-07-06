@@ -38,9 +38,18 @@ const AppConfigContext = createContext<AppConfigContextType>({
   setAlerta: () => {},
 });
 
+import { authService } from '@/services/authService';
+
 function readFromStorage(): AppConfig {
   if (typeof window === 'undefined') return DEFAULT_CONFIG;
   try {
+    const rawUser = localStorage.getItem('usuario');
+    if (rawUser) {
+      const user = JSON.parse(rawUser);
+      if (user.appConfig) {
+        return { ...DEFAULT_CONFIG, ...user.appConfig };
+      }
+    }
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return DEFAULT_CONFIG;
     return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
@@ -56,10 +65,32 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
     setConfigState(readFromStorage());
   }, []);
 
+  const syncToBackend = async (newConfig: AppConfig) => {
+    try {
+      const rawUser = localStorage.getItem('usuario');
+      if (rawUser) {
+        const user = JSON.parse(rawUser);
+        const payload = {
+          nombre: user.nombre,
+          email: user.email,
+          monedaBase: user.monedaBase,
+          zonaHoraria: user.zonaHoraria,
+          perfilFiscal: user.perfilFiscal,
+          appConfig: newConfig
+        };
+        const updatedUser = await authService.updateUser(user.id, payload);
+        localStorage.setItem('usuario', JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error("Failed to sync config to backend", error);
+    }
+  };
+
   const setConfig = (partial: Partial<AppConfig>) => {
     setConfigState((prev) => {
       const next = { ...prev, ...partial };
       localStorage.setItem(LS_KEY, JSON.stringify(next));
+      syncToBackend(next);
       return next;
     });
   };
@@ -71,6 +102,7 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
         alertas: { ...prev.alertas, [key]: value },
       };
       localStorage.setItem(LS_KEY, JSON.stringify(next));
+      syncToBackend(next);
       return next;
     });
   };

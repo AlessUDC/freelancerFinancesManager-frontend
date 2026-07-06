@@ -141,105 +141,141 @@ export default function DashboardPage() {
   const [monthlyData, setMonthlyData] = useState<{ month: string; ingresos: number; gastos: number }[]>([]);
   const [categoryData, setCategoryData] = useState<{ label: string; value: number; color: string }[]>([]);
 
-  // ── Función de carga reutilizable (evita window.location.reload) ──────
-  const loadData = () => {
-    const ingresos = ingresosService.getAll();
-    const gastos = gastosService.getAll();
-    const subs = suscripcionesService.getAll();
+  // ── Función de carga reutilizable ──────
+  const loadData = async () => {
+    try {
+      const ingresos = await ingresosService.getAll();
+      const gastos = await gastosService.getAll();
+      const subs = await suscripcionesService.getAll();
 
-    // 1. Histórico global (necesario para el Runway - cuánto dinero hay realmente)
-    const ingHistorico = ingresos
-      .filter((i) => i.status === 'PAGADO')
-      .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
-    const gasHistorico = gastos.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-    setBalanceHistorico(ingHistorico - gasHistorico);
+      // 1. Histórico global (necesario para el Runway - cuánto dinero hay realmente)
+      const ingHistorico = ingresos
+        .filter((i) => i.status === 'PAGADO')
+        .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+      const gasHistorico = gastos.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+      setBalanceHistorico(ingHistorico - gasHistorico);
 
-    // 2. Gasto mensual promedio (Runway) — promedio de los últimos 6 meses + costo fijo de suscripciones
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
+      // 2. Gasto mensual promedio (Runway) — promedio de los últimos 6 meses + costo fijo de suscripciones
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
 
-    // Collect monthly totals for the last 6 months (gastos registrados)
-    const monthlyTotals: number[] = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(currentYear, currentMonth - i, 1);
-      const m = d.getMonth();
-      const y = d.getFullYear();
-      const total = gastos
-        .filter((g) => { if (!g.fecha) return false; const fd = new Date(g.fecha + 'T00:00:00'); return fd.getMonth() === m && fd.getFullYear() === y; })
+      // Collect monthly totals for the last 6 months (gastos registrados)
+      const monthlyTotals: number[] = [];
+      for (let i = 0; i < 6; i++) {
+        const d = new Date(currentYear, currentMonth - i, 1);
+        const m = d.getMonth();
+        const y = d.getFullYear();
+        const total = gastos
+          .filter((g) => { if (!g.fecha) return false; const fd = new Date(g.fecha + 'T00:00:00'); return fd.getMonth() === m && fd.getFullYear() === y; })
+          .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+        monthlyTotals.push(total);
+      }
+      const monthsWithData = monthlyTotals.filter(t => t > 0);
+      const avgHistoricBurn = monthsWithData.length > 0
+        ? monthsWithData.reduce((a, b) => a + b, 0) / monthsWithData.length
+        : 0;
+      // Añadir costo mensual de suscripciones activas (convertido a moneda base)
+      const costoSubsMensual = subs
+        .filter((s) => s.status === 'ACTIVA')
+        .reduce((sum, s) => sum + convert(s.ciclo === 'ANUAL' ? s.monto / 12 : s.monto, s.moneda), 0);
+      const avgMonthlyBurn = avgHistoricBurn + costoSubsMensual;
+      setGastoMensualActual(avgMonthlyBurn);
+
+      // 3. Filtrados por el período seleccionado (para las StatCards y TaxCow)
+      const ingFiltrado = ingresos
+        .filter((i) => i.status === 'PAGADO' && isWithinTimeFilter(i.fecha, timeFilter))
+        .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+
+      const gasFiltrado = gastos
+        .filter((g) => isWithinTimeFilter(g.fecha, timeFilter))
         .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-      monthlyTotals.push(total);
-    }
-    const monthsWithData = monthlyTotals.filter(t => t > 0);
-    const avgHistoricBurn = monthsWithData.length > 0
-      ? monthsWithData.reduce((a, b) => a + b, 0) / monthsWithData.length
-      : 0;
-    // Añadir costo mensual de suscripciones activas (convertido a moneda base)
-    const costoSubsMensual = subs
-      .filter((s) => s.status === 'ACTIVA')
-      .reduce((sum, s) => sum + convert(s.ciclo === 'ANUAL' ? s.monto / 12 : s.monto, s.moneda), 0);
-    const avgMonthlyBurn = avgHistoricBurn + costoSubsMensual;
-    setGastoMensualActual(avgMonthlyBurn);
 
-    // 3. Filtrados por el período seleccionado (para las StatCards y TaxCow)
-    const ingFiltrado = ingresos
-      .filter((i) => i.status === 'PAGADO' && isWithinTimeFilter(i.fecha, timeFilter))
-      .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+      const gasDeducibleFiltrado = gastos
+        .filter((g) => g.esDeducible && isWithinTimeFilter(g.fecha, timeFilter))
+        .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
 
-    const gasFiltrado = gastos
-      .filter((g) => isWithinTimeFilter(g.fecha, timeFilter))
-      .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+      setTotalIngresosFiltrados(ingFiltrado);
+      setTotalGastosFiltrados(gasFiltrado);
+      setTotalGastosDeduciblesFiltrados(gasDeducibleFiltrado);
 
-    const gasDeducibleFiltrado = gastos
-      .filter((g) => g.esDeducible && isWithinTimeFilter(g.fecha, timeFilter))
-      .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+      const proxSubs = subs
+        .filter((s) => s.proximaRenovacion && s.status === 'ACTIVA')
+        .sort((a, b) => new Date(a.proximaRenovacion).getTime() - new Date(b.proximaRenovacion).getTime())
+        .slice(0, 5);
+      setRenovaciones(proxSubs);
+      setAlertas(suscripcionesService.proximasRenovaciones(subs, 7));
 
-    setTotalIngresosFiltrados(ingFiltrado);
-    setTotalGastosFiltrados(gasFiltrado);
-    setTotalGastosDeduciblesFiltrados(gasDeducibleFiltrado);
+      // Ingresos pendientes o atrasados
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const pendientes = ingresos
+        .filter(i => {
+          let computedStatus = i.status;
+          if (computedStatus !== 'PAGADO' && i.fechaVencimiento) {
+            const v = new Date(i.fechaVencimiento + 'T00:00:00');
+            if (v < now) computedStatus = 'ATRASADO';
+          }
+          return computedStatus === 'PENDIENTE' || computedStatus === 'ATRASADO';
+        })
+        .slice(0, 5);
+      setIngresosPendientes(pendientes);
+      
+      // 4. Update charts with filtered data so they respect the time filter
+      const filteredIngresos = ingresos.filter((i) => isWithinTimeFilter(i.fecha, timeFilter));
+      const filteredGastos = gastos.filter((g) => isWithinTimeFilter(g.fecha, timeFilter));
 
-    const proxSubs = subs
-      .filter((s) => s.proximaRenovacion && s.status === 'ACTIVA')
-      .sort((a, b) => new Date(a.proximaRenovacion).getTime() - new Date(b.proximaRenovacion).getTime())
-      .slice(0, 5);
-    setRenovaciones(proxSubs);
-    setAlertas(suscripcionesService.proximasRenovaciones(7));
+      setMonthlyData(buildChartData(filteredIngresos, filteredGastos, convert, timeFilter));
+      setCategoryData(buildCategoryData(filteredGastos, convert));
 
-    // Ingresos pendientes o atrasados
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const pendientes = ingresos
-      .filter(i => {
-        let computedStatus = i.status;
-        if (computedStatus !== 'PAGADO' && i.fechaVencimiento) {
-          const v = new Date(i.fechaVencimiento + 'T00:00:00');
-          if (v < now) computedStatus = 'ATRASADO';
-        }
-        return computedStatus === 'PENDIENTE' || computedStatus === 'ATRASADO';
-      })
-      .slice(0, 5);
-    // 4. Update charts with filtered data so they respect the time filter
-    const filteredIngresos = ingresos.filter((i) => isWithinTimeFilter(i.fecha, timeFilter));
-    const filteredGastos = gastos.filter((g) => isWithinTimeFilter(g.fecha, timeFilter));
+      const raw = localStorage.getItem('usuario');
+      if (raw) {
+        try {
+          const u = JSON.parse(raw);
+          if (u.porcentajeImpuesto) setPorcentajeImpuesto(u.porcentajeImpuesto);
+        } catch { }
+      }
 
-    setMonthlyData(buildChartData(filteredIngresos, filteredGastos, convert, timeFilter));
-    setCategoryData(buildCategoryData(filteredGastos, convert));
+      // Metas y límites
+      const gastosEsteMes = gastos
+        .filter((g) => {
+          if (!g.fecha) return false;
+          const fd = new Date(g.fecha + 'T00:00:00');
+          return fd.getMonth() === now.getMonth() && fd.getFullYear() === now.getFullYear();
+        })
+        .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
 
-    const raw = localStorage.getItem('usuario');
-    if (raw) {
-      try {
-        const u = JSON.parse(raw);
-        if (u.porcentajeImpuesto) setPorcentajeImpuesto(u.porcentajeImpuesto);
-      } catch { }
+      const ingresosEsteMes = ingresos
+        .filter((i) => {
+          if (!i.fecha) return false;
+          const fd = new Date(i.fecha + 'T00:00:00');
+          return i.status === 'PAGADO' && fd.getMonth() === now.getMonth() && fd.getFullYear() === now.getFullYear();
+        })
+        .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+      
+      setGastosEsteMesState(gastosEsteMes);
+      setIngresosEsteMesState(ingresosEsteMes);
+
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al cargar datos del dashboard');
     }
   };
 
+  const [gastosEsteMesState, setGastosEsteMesState] = useState(0);
+  const [ingresosEsteMesState, setIngresosEsteMesState] = useState(0);
+
   // Función para marcar ingreso como pagado — sin reload()
-  const handleMarkAsPaid = (id: number) => {
-    ingresosService.updateStatus(id, 'PAGADO');
-    ingresosService.update(id, { fecha: new Date().toISOString().split('T')[0] });
-    toast.success('Ingreso marcado como pagado ✓');
-    loadData();
+  const handleMarkAsPaid = async (id: number) => {
+    try {
+      await ingresosService.updateStatus(id, 'PAGADO');
+      await ingresosService.update(id, { fecha: new Date().toISOString().split('T')[0] });
+      toast.success('Ingreso marcado como pagado ✓');
+      loadData();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al actualizar ingreso');
+    }
   };
 
   useEffect(() => {
@@ -261,26 +297,9 @@ export default function DashboardPage() {
     'DIA': 'Hoy',
   };
   // ── Metas y límites (mensuales por definición en config) ──
-  const now = new Date();
-  const gastosEsteMes = gastosService.getAll()
-    .filter((g) => {
-      if (!g.fecha) return false;
-      const fd = new Date(g.fecha + 'T00:00:00');
-      return fd.getMonth() === now.getMonth() && fd.getFullYear() === now.getFullYear();
-    })
-    .reduce((s, g) => s + convert(g.monto, g.moneda), 0);
-
-  const ingresosEsteMes = ingresosService.getAll()
-    .filter((i) => {
-      if (!i.fecha) return false;
-      const fd = new Date(i.fecha + 'T00:00:00');
-      return i.status === 'PAGADO' && fd.getMonth() === now.getMonth() && fd.getFullYear() === now.getFullYear();
-    })
-    .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
-
-  const gastosSuperanLimite = config.limiteGastos > 0 && gastosEsteMes > config.limiteGastos;
+  const gastosSuperanLimite = config.limiteGastos > 0 && gastosEsteMesState > config.limiteGastos;
   const progresoMeta = config.metaIngresoMensual > 0
-    ? Math.min((ingresosEsteMes / config.metaIngresoMensual) * 100, 100)
+    ? Math.min((ingresosEsteMesState / config.metaIngresoMensual) * 100, 100)
     : 0;
 
   return (
@@ -297,14 +316,14 @@ export default function DashboardPage() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-red-700">⚠️ Situación crítica — Límite de gastos superado</p>
             <p className="text-xs text-red-500 mt-0.5">
-              Llevas {fmt(gastosEsteMes)} en gastos este mes, superando tu límite de{' '}
+              Llevas {fmt(gastosEsteMesState)} en gastos este mes, superando tu límite de{' '}
               <span className="font-bold">{fmt(config.limiteGastos)}</span>.
               Revisa tu módulo de gastos.
             </p>
           </div>
           <div className="shrink-0 text-right">
             <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-1 rounded-lg">
-              +{fmt(gastosEsteMes - config.limiteGastos)} sobre el límite
+              +{fmt(gastosEsteMesState - config.limiteGastos)} sobre el límite
             </span>
           </div>
         </div>
@@ -329,7 +348,7 @@ export default function DashboardPage() {
                 }`}>
                 {progresoMeta.toFixed(1)}%
               </span>
-              <p className="text-[10px] text-gray-400">{fmt(ingresosEsteMes)} cobrados</p>
+              <p className="text-[10px] text-gray-400">{fmt(ingresosEsteMesState)} cobrados</p>
             </div>
           </div>
           <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
@@ -344,7 +363,7 @@ export default function DashboardPage() {
             <p className="text-[11px] text-[#1cc88a] font-semibold mt-1.5">🎉 ¡Meta alcanzada este mes!</p>
           ) : (
             <p className="text-[11px] text-gray-400 mt-1.5">
-              Faltan <span className="font-semibold text-gray-600">{fmt(config.metaIngresoMensual - ingresosEsteMes)}</span> para alcanzar tu meta.
+              Faltan <span className="font-semibold text-gray-600">{fmt(config.metaIngresoMensual - ingresosEsteMesState)}</span> para alcanzar tu meta.
             </p>
           )}
         </div>

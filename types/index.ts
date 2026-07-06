@@ -11,8 +11,8 @@ export interface Usuario {
   email: string;
   monedaBase?: string;          // 'USD', 'MXN', 'EUR', etc.
   zonaHoraria?: string;         // 'America/Mexico_City'
-  porcentajeImpuesto?: number;  // % a reservar para impuestos (ej. 20)
   perfilFiscal?: PerfilFiscal;  // Datos de facturación freelancer
+  appConfig?: any;              // Configuración de la app (taxCow, etc.)
 }
 
 export interface LoginPayload {
@@ -32,7 +32,8 @@ export interface UpdateUserPayload {
   password?: string;
   monedaBase?: string;
   zonaHoraria?: string;
-  porcentajeImpuesto?: number;
+  perfilFiscal?: PerfilFiscal;
+  appConfig?: any;
 }
 
 // ── Ingresos ─────────────────────────────────────────────────
