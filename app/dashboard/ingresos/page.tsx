@@ -8,6 +8,7 @@ import { Ingreso, IngresoStatus, Usuario } from '@/types';
 import { MONEDAS_DISPONIBLES } from '@/lib/currency';
 import { formatLocalDate, isWithinTimeFilter, TimeFilter } from '@/lib/dates';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
 const STATUS_META: Record<IngresoStatus, { label: string; color: string; dot: string }> = {
@@ -27,6 +28,7 @@ const FILTROS: Array<{ value: IngresoStatus | 'TODOS'; label: string }> = [
 
 export default function IngresosPage() {
   const { fmt, convert, baseCurrency } = useCurrency();
+  const { config } = useAppConfig();
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<IngresoStatus | 'TODOS'>('TODOS');
@@ -124,7 +126,7 @@ export default function IngresosPage() {
     setEditId(null);
     setProyectoNombre('');
     setMontoBruto('');
-    setRetencion(usuario?.porcentajeImpuesto?.toString() || '0');
+    setRetencion(config.porcentajeRetencion.toString() || '0');
     setMoneda(baseCurrency || 'USD');
     setStatus('ESTIMADO');
     setFecha('');
@@ -189,14 +191,14 @@ export default function IngresosPage() {
     return { ...item, computedStatus: currentStatus };
   });
 
-  const filtrados = ingresosProcesados
-    .filter((i) => filtro === 'TODOS' || i.computedStatus === filtro)
-    .filter((i) => !busqueda || i.proyectoNombre.toLowerCase().includes(busqueda.toLowerCase()));
-
-  const ingresosEnTiempo = ingresos.filter(i => {
+  const ingresosEnTiempo = ingresosProcesados.filter(i => {
     const dateToUse = i.status === 'PAGADO' ? i.fecha : i.fechaEmision;
     return isWithinTimeFilter(dateToUse, timeFilter);
   });
+
+  const filtrados = ingresosEnTiempo
+    .filter((i) => filtro === 'TODOS' || i.computedStatus === filtro)
+    .filter((i) => !busqueda || i.proyectoNombre.toLowerCase().includes(busqueda.toLowerCase()));
 
   const ingresosEnTiempoPagados = ingresosEnTiempo.filter(i => i.status === 'PAGADO');
   const totalBruto = ingresosEnTiempoPagados.reduce((s, i) => s + convert(i.montoBruto, i.moneda), 0);
@@ -386,8 +388,14 @@ export default function IngresosPage() {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl animate-scale-in max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => { setModalOpen(false); resetForm(); }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-xl animate-scale-in max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
               <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
                 <i className={`fas ${editId ? 'fa-edit text-blue-500' : 'fa-plus-circle text-[#1cc88a]'}`} />

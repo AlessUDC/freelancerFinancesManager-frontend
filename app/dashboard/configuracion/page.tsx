@@ -70,6 +70,7 @@ export default function ConfiguracionPage() {
   const [moneda, setMoneda]       = useState(baseCurrency);
   const [tz, setTz]               = useState('America/Mexico_City');
   const [taxCow, setTaxCow]       = useState(config.taxCow);
+  const [retencion, setRetencion] = useState(config.porcentajeRetencion || 0);
   const [meta, setMeta]           = useState(config.metaIngresoMensual);
   const [limite, setLimite]       = useState(config.limiteGastos);
   const [saved, setSaved]         = useState(false);
@@ -82,6 +83,7 @@ export default function ConfiguracionPage() {
     }
     setMoneda(baseCurrency);
     setTaxCow(config.taxCow);
+    setRetencion(config.porcentajeRetencion || 0);
     setMeta(config.metaIngresoMensual);
     setLimite(config.limiteGastos);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,7 +108,7 @@ export default function ConfiguracionPage() {
     }
 
     // Goals & tax cow → appConfig
-    setConfig({ taxCow, metaIngresoMensual: meta, limiteGastos: limite });
+    setConfig({ taxCow, porcentajeRetencion: retencion, metaIngresoMensual: meta, limiteGastos: limite });
 
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -132,7 +134,7 @@ export default function ConfiguracionPage() {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-5">
+      <form id="config-form" onSubmit={handleSave} className="space-y-5">
         {/* ── A: Preferencias Financieras ── */}
         <Section
           icon="fas fa-coins"
@@ -205,6 +207,27 @@ export default function ConfiguracionPage() {
               <strong>{currSymbol}{(1000 * taxCow / 100).toFixed(0)}</strong> para impuestos en tu <em>Tax Cow</em>.
             </p>
           </div>
+
+          {/* Porcentaje de Retención */}
+          <div>
+            <label htmlFor="inputRetencion" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+              Porcentaje de Retención / IGV
+            </label>
+            <div className="relative">
+              <i className="fas fa-percent absolute left-3 top-1/2 -translate-y-1/2 text-[#4e73df] text-xs pointer-events-none" />
+              <input
+                id="inputRetencion"
+                type="number" min={0} max={100} step={1}
+                value={retencion || ''}
+                onChange={(e) => setRetencion(Number(e.target.value))}
+                placeholder="0"
+                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#4e73df]/30 focus:border-[#4e73df] transition"
+              />
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1.5">
+              Este valor se cargará por defecto al registrar Ingresos, Gastos y Suscripciones.
+            </p>
+          </div>
         </Section>
 
         {/* ── B: Metas y Presupuestos ── */}
@@ -275,17 +298,17 @@ export default function ConfiguracionPage() {
           />
         </Section>
 
-        {/* Save button */}
-        <div className="flex justify-end">
-          <button
-            id="btnGuardarConfig"
-            type="submit"
-            className="flex items-center gap-2 bg-[#4e73df] hover:bg-[#3d5fc9] text-white font-bold px-6 py-2.5 rounded-xl shadow-sm shadow-blue-500/20 transition text-sm"
-          >
-            <i className="fas fa-check" /> Guardar configuración
-          </button>
-        </div>
       </form>
+
+      {/* Floating Save Button */}
+      <button
+        form="config-form"
+        type="submit"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#4e73df] hover:bg-[#3d5fc9] text-white font-bold px-6 py-3 rounded-full shadow-lg shadow-blue-500/40 hover:-translate-y-1 transition-all"
+      >
+        <i className="fas fa-save text-lg" />
+        <span className="hidden sm:inline">Guardar Configuración</span>
+      </button>
     </div>
   );
 }

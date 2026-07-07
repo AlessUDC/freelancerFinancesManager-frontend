@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'react-toastify';
 import { StatCard } from '@/components/StatCard';
-import { gastosService } from '@/services/finanzasService';
-import { Gasto, GastoCategoria } from '@/types';
+import { gastosService, ingresosService } from '@/services/finanzasService';
+import { Gasto, GastoCategoria, Ingreso } from '@/types';
 import { MONEDAS_DISPONIBLES } from '@/lib/currency';
 import { formatLocalDate, isWithinTimeFilter, TimeFilter, daysUntil } from '@/lib/dates';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { suscripcionesService } from '@/services/finanzasService';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { UpcomingPaymentsTimeline } from '@/components/UpcomingPaymentsTimeline';
@@ -68,6 +69,7 @@ const CATEGORIA_META: Record<GastoCategoria, { label: string; icon: string; colo
 
 export default function GastosPage() {
   const { fmt, convert, baseCurrency } = useCurrency();
+  const { config } = useAppConfig();
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [filtroCat, setFiltroCat] = useState<GastoCategoria | 'TODOS'>('TODOS');
@@ -76,11 +78,17 @@ export default function GastosPage() {
   const [usuario, setUsuario] = useState<any>(null);
 
   const [suscripciones, setSuscripciones] = useState<any[]>([]);
+  const [ingresos, setIngresos] = useState<Ingreso[]>([]);
 
   const [loading, setLoading] = useState(true);
 
   // Delete Modal state
   const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  // Retiro modal state
+  const [retiroOpen, setRetiroOpen] = useState(false);
+  const [montoRetiro, setMontoRetiro] = useState('');
+  const [cuentaRetiro, setCuentaRetiro] = useState('');
 
   // Form State
   const [editId, setEditId] = useState<number | null>(null);
@@ -92,12 +100,18 @@ export default function GastosPage() {
   const [esDeducible, setEsDeducible] = useState(true);
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [fecha, setFecha] = useState('');
+  const [igv, setIgv] = useState(config.porcentajeRetencion || 0);
 
   const refresh = async () => {
     try {
-      const data = await gastosService.getAll();
-      setGastos(data);
-      setSuscripciones(await suscripcionesService.getAll());
+      const [gastosData, ingresosData, subsData] = await Promise.all([
+        gastosService.getAll(),
+        ingresosService.getAll(),
+        suscripcionesService.getAll(),
+      ]);
+      setGastos(gastosData);
+      setIngresos(ingresosData);
+      setSuscripciones(subsData);
     } catch (err) {
       console.error(err);
       toast.error('Error al cargar gastos');
@@ -124,19 +138,23 @@ export default function GastosPage() {
     setEsDeducible(true);
     setEsRecurrente(false);
     setFecha('');
+    setIgv(config.porcentajeRetencion || 0);
   };
 
   const openEditModal = (gasto: Gasto) => {
     setEditId(gasto.id);
     setConcepto(gasto.concepto);
     const cant = gasto.cantidad || 1;
+    const igvRate = gasto.igv ?? config.porcentajeRetencion ?? 0;
     setCantidad(cant);
-    setMontoUnitario((gasto.monto / cant).toString());
+    // Revert IGV: monto guardado = unitario * cant * (1 + igv/100) → recuperamos el unitario original
+    setMontoUnitario((gasto.monto / cant / (1 + igvRate / 100)).toFixed(2));
     setMoneda(gasto.moneda);
     setCategoria(gasto.categoria);
     setEsDeducible(gasto.esDeducible);
     setEsRecurrente(gasto.esRecurrente || false);
     setFecha(gasto.fecha || '');
+    setIgv(igvRate);
     setModalOpen(true);
   };
 
@@ -145,7 +163,7 @@ export default function GastosPage() {
     const mUnitario = parseFloat(montoUnitario);
     if (!concepto.trim() || isNaN(mUnitario) || mUnitario <= 0 || cantidad < 1) return;
 
-    const montoTotal = mUnitario * cantidad;
+    const montoTotal = mUnitario * cantidad * (1 + (igv / 100));
 
     const data: Omit<Gasto, 'id'> = {
       concepto: concepto.trim(),
@@ -155,7 +173,8 @@ export default function GastosPage() {
       categoria,
       esDeducible,
       esRecurrente,
-      fecha
+      fecha,
+      igv
     };
 
     try {
@@ -189,12 +208,48 @@ export default function GastosPage() {
     }
   };
 
-  const filtrados = gastos
-    .filter((g) => filtroCat === 'TODOS' || g.categoria === filtroCat)
-    .filter((g) => !busqueda || g.concepto.toLowerCase().includes(busqueda.toLowerCase()));
+  const handleRetiro = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const monto = parseFloat(montoRetiro);
+    if (isNaN(monto) || monto <= 0) return;
+    // Compute saldo on the fly using current state
+    const totalNetos = ingresos
+      .filter((i) => i.status === 'PAGADO')
+      .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+    const totalGastos = gastos.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+    const saldoActual = totalNetos - totalGastos;
+    if (monto > saldoActual) {
+      toast.error('Saldo insuficiente para realizar el retiro');
+      return;
+    }
+    try {
+      await gastosService.add({
+        concepto: `Retiro a cuenta bancaria: ${cuentaRetiro}`,
+        monto,
+        moneda: baseCurrency,
+        categoria: 'PERSONAL',
+        esDeducible: false,
+        esRecurrente: false,
+        fecha: new Date().toISOString().split('T')[0],
+        igv: 0,
+        cantidad: 1,
+      });
+      setRetiroOpen(false);
+      setMontoRetiro('');
+      toast.success('Retiro registrado exitosamente ✓');
+      refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al registrar el retiro');
+    }
+  };
 
   // 1. Filtrar gastos según factor tiempo
   const gastosEnTiempo = gastos.filter((g) => isWithinTimeFilter(g.fecha, timeFilter));
+
+  const filtrados = gastosEnTiempo
+    .filter((g) => filtroCat === 'TODOS' || g.categoria === filtroCat)
+    .filter((g) => !busqueda || g.concepto.toLowerCase().includes(busqueda.toLowerCase()));
 
   const totalMensual = gastosEnTiempo.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
 
@@ -231,6 +286,13 @@ export default function GastosPage() {
     .reduce((s, sub) => s + convert(sub.monto, sub.moneda), 0);
 
   const gastosPorPagar30d = gastosFuturos + subsFuturas;
+
+  // 5. Saldo virtual (ingresos PAGADOS netos − todos los gastos registrados)
+  const totalIngresosNetos = ingresos
+    .filter((i) => i.status === 'PAGADO')
+    .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+  const totalGastosSaldo = gastos.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+  const saldoVirtual = totalIngresosNetos - totalGastosSaldo;
 
   // Data para dona
   const categoryDonutData = CATEGORIAS
@@ -354,6 +416,62 @@ export default function GastosPage() {
         </div>
       </div>
 
+      {/* ── Panel de Saldo Virtual ─────────────────────────────────────── */}
+      <div className="fp-card p-5">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+              saldoVirtual >= 0 ? 'bg-green-100' : 'bg-red-100'
+            }`}>
+              <i className={`fas fa-wallet text-lg ${
+                saldoVirtual >= 0 ? 'text-green-600' : 'text-red-600'
+              }`} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Saldo Virtual SaaS</p>
+              <p className={`text-2xl font-bold ${
+                saldoVirtual >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {saldoVirtual < 0 ? '−' : ''}{fmt(Math.abs(saldoVirtual))}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                💰 Cobrado: <span className="font-semibold text-gray-600">{fmt(totalIngresosNetos)}</span>
+                &nbsp;·&nbsp;
+                📤 Gastado: <span className="font-semibold text-gray-600">{fmt(totalGastosSaldo)}</span>
+              </p>
+            </div>
+          </div>
+          <button
+            id="btnRetirarSaldo"
+            onClick={() => { setCuentaRetiro(usuario?.cuentaBancaria || ''); setRetiroOpen(true); }}
+            disabled={saldoVirtual <= 0}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-4 py-2.5 rounded-xl shadow-sm shadow-green-500/20 transition-all text-sm"
+          >
+            <i className="fas fa-arrow-circle-down" /> Retirar a Cuenta
+          </button>
+        </div>
+        {totalIngresosNetos > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1.5">
+              <span>
+                Gastos ({Math.min(100, (totalGastosSaldo / totalIngresosNetos) * 100).toFixed(0)}% de ingresos cobrados)
+              </span>
+              <span>Libre: {fmt(Math.max(0, saldoVirtual))}</span>
+            </div>
+            <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${
+                  saldoVirtual >= 0
+                    ? 'bg-gradient-to-r from-green-400 to-green-500'
+                    : 'bg-gradient-to-r from-red-400 to-red-500'
+                }`}
+                style={{ width: `${Math.min(100, (totalGastosSaldo / totalIngresosNetos) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <UpcomingPaymentsTimeline
         gastos={gastos}
         suscripciones={suscripciones}
@@ -464,8 +582,15 @@ export default function GastosPage() {
 
       {/* Modal Form */}
       {modalOpen && (
-        <div className="fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in">
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          onClick={() => { setModalOpen(false); resetForm(); }}
+        >
+          <div className="flex items-center justify-center min-h-full p-4">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
               <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
                 <i className={`fas ${editId ? 'fa-edit' : 'fa-plus-circle'} text-[#e74a3b]`} /> {editId ? 'Editar Gasto' : 'Nuevo Gasto'}
@@ -483,7 +608,7 @@ export default function GastosPage() {
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label htmlFor="inputCantidad" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Cantidad</label>
                   <input id="inputCantidad" type="number" required min="1" step="1" value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}
@@ -501,6 +626,12 @@ export default function GastosPage() {
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm bg-white transition">
                     {MONEDAS_DISPONIBLES.map((m) => <option key={m.code} value={m.code}>{m.code}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">IGV ({igv}%) incluido</label>
+                  <p className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-sm text-[#e74a3b] font-semibold">
+                    {moneda} {((parseFloat(montoUnitario) || 0) * (igv / (100 + igv))).toFixed(2)}
+                  </p>
                 </div>
               </div>
 
@@ -567,11 +698,87 @@ export default function GastosPage() {
                 </div>
               </div>
 
+              {usuario?.cuentaBancaria && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
+                  <i className="fas fa-info-circle mt-0.5 shrink-0 text-blue-500" />
+                  <p>
+                    <strong>Nota:</strong> Este gasto se registrará usando tu cuenta bancaria principal: <span className="font-bold">{usuario.cuentaBancaria}</span>.
+                  </p>
+                </div>
+              )}
+
               <button type="submit"
                 className="w-full py-3 rounded-xl bg-[#e74a3b] hover:bg-[#c0392b] text-white font-bold transition flex items-center justify-center gap-2 text-sm">
                 <i className="fas fa-check" /> Guardar Gasto
               </button>
             </form>
+          </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Retiro ─────────────────────────────────────────────── */}
+      {retiroOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          onClick={() => setRetiroOpen(false)}
+        >
+          <div className="flex items-center justify-center min-h-full p-4">
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-scale-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                  <i className="fas fa-arrow-circle-down text-green-500" /> Retirar Saldo a Cuenta
+                </h5>
+                <button
+                  onClick={() => setRetiroOpen(false)}
+                  className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition"
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+              <form onSubmit={handleRetiro} className="px-6 py-5 space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                  <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-0.5">Saldo disponible</p>
+                  <p className="text-2xl font-bold text-green-700">{fmt(saldoVirtual)}</p>
+                  <p className="text-xs text-green-500 mt-0.5">Ingresos cobrados menos gastos registrados</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                    Monto a Retirar ({baseCurrency})
+                  </label>
+                  <input
+                    type="number" required min="0.01" step="0.01"
+                    value={montoRetiro}
+                    onChange={(e) => setMontoRetiro(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 text-sm transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Cuenta Destino</label>
+                  <input
+                    type="text" required
+                    value={cuentaRetiro}
+                    onChange={(e) => setCuentaRetiro(e.target.value)}
+                    placeholder="Número de cuenta bancaria"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 text-sm transition"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+                  <i className="fas fa-info-circle mr-1" />
+                  El retiro se registrará como gasto en tu historial para mantener el saldo actualizado.
+                </p>
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold transition flex items-center justify-center gap-2 text-sm"
+                >
+                  <i className="fas fa-check" /> Confirmar Retiro
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

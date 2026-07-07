@@ -11,6 +11,7 @@ export interface AppConfig {
   taxCow: number;              // % tax reserve (0-50)
   metaIngresoMensual: number;  // Monthly net income goal
   limiteGastos: number;        // Monthly expense alert limit
+  porcentajeRetencion: number; // Porcentaje de retención / IGV
   alertas: AppAlerts;
 }
 
@@ -18,6 +19,7 @@ const DEFAULT_CONFIG: AppConfig = {
   taxCow: 20,
   metaIngresoMensual: 0,
   limiteGastos: 0,
+  porcentajeRetencion: 0,
   alertas: {
     renovaciones7Dias: true,
     inyectarSuscripciones: true,
@@ -71,7 +73,12 @@ export function AppConfigProvider({ children }: { children: ReactNode }) {
       if (rawUser) {
         const user = JSON.parse(rawUser);
         const payload = {
-          nombre: user.nombre,
+          nombres: user.nombres,
+          apellidoPaterno: user.apellidoPaterno,
+          apellidoMaterno: user.apellidoMaterno,
+          telefono: user.telefono,
+          fechaNacimiento: user.fechaNacimiento,
+          cuentaBancaria: user.cuentaBancaria,
           email: user.email,
           monedaBase: user.monedaBase,
           zonaHoraria: user.zonaHoraria,

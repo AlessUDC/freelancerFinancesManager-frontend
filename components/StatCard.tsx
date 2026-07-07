@@ -13,7 +13,7 @@ interface StatCardProps {
 }
 
 export function StatCard({ label, value, icon, accentColor = 'border-l-[#4e73df]', iconColor = 'text-[#4e73df]', subLabel, trend }: StatCardProps) {
-  const { loading } = useCurrency();
+  const { loading, baseCurrency } = useCurrency();
 
   return (
     <div className={`fp-card border-l-4 ${accentColor} px-5 py-4 animate-fade-in`}>

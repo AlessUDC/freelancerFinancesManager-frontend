@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { StatCard } from '@/components/StatCard';
-import { suscripcionesService, gastosService } from '@/services/finanzasService';
-import { Suscripcion, SuscripcionCiclo } from '@/types';
-import { MONEDAS_DISPONIBLES } from '@/lib/currency';
+import { suscripcionesService, gastosService, ingresosService } from '@/services/finanzasService';
+import { Suscripcion, SuscripcionCiclo, Ingreso, Gasto } from '@/types';
 import { formatLocalDate, renewalBadge } from '@/lib/dates';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useAppConfig } from '@/hooks/useAppConfig';
+import { useAuth } from '@/hooks/useAuth';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { MONEDAS_DISPONIBLES } from '@/lib/currency';
 
 const isOverdue = (dateStr: string) => {
   if (!dateStr) return false;
@@ -20,9 +22,16 @@ const isOverdue = (dateStr: string) => {
 
 export default function SuscripcionesPage() {
   const { fmt, convert, baseCurrency } = useCurrency();
+  const { config } = useAppConfig();
+  const { usuario } = useAuth();
   const [suscripciones, setSuscripciones] = useState<Suscripcion[]>([]);
+  const [gastos, setGastos] = useState<Gasto[]>([]);
+  const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+
+  // Pay Modal state
+  const [payItem, setPayItem] = useState<Suscripcion | null>(null);
 
   // Delete Modal state
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -34,31 +43,42 @@ export default function SuscripcionesPage() {
   const [moneda, setMoneda] = useState('USD');
   const [ciclo, setCiclo] = useState<SuscripcionCiclo>('MENSUAL');
   const [proximaRenovacion, setProximaRen] = useState('');
+  const [igv, setIgv] = useState(config.porcentajeRetencion || 0);
 
   const refresh = async () => {
     try {
-      const data = await suscripcionesService.getAll();
-      setSuscripciones(data);
+      const [subsData, gastosData, ingresosData] = await Promise.all([
+        suscripcionesService.getAll(),
+        gastosService.getAll(),
+        ingresosService.getAll(),
+      ]);
+      setSuscripciones(subsData);
+      setGastos(gastosData);
+      setIngresos(ingresosData);
     } catch (err) {
       console.error(err);
-      toast.error('Error al cargar suscripciones');
+      toast.error('Error al cargar datos');
     }
   };
-  
+
   useEffect(() => { refresh(); }, []);
 
   const resetForm = () => {
     setEditId(null);
     setServicio(''); setMonto(''); setMoneda('USD'); setCiclo('MENSUAL'); setProximaRen('');
+    setIgv(config.porcentajeRetencion || 0);
   };
 
   const openEditModal = (item: Suscripcion) => {
     setEditId(item.id);
     setServicio(item.servicio);
-    setMonto(item.monto.toString());
+    const igvRate = item.igv ?? config.porcentajeRetencion ?? 0;
+    // Revert IGV
+    setMonto((item.monto / (1 + igvRate / 100)).toFixed(2));
     setMoneda(item.moneda);
     setCiclo(item.ciclo);
     setProximaRen(item.proximaRenovacion || '');
+    setIgv(igvRate);
     setModalOpen(true);
   };
 
@@ -77,11 +97,12 @@ export default function SuscripcionesPage() {
 
     const data = {
       servicio: servicio.trim(),
-      monto: c,
+      monto: c * (1 + (igv / 100)),
       moneda,
       ciclo,
       proximaRenovacion,
       status: 'ACTIVA' as const,
+      igv,
     };
 
     try {
@@ -101,31 +122,53 @@ export default function SuscripcionesPage() {
     }
   };
 
-  const handlePay = async (item: Suscripcion) => {
+  const handlePay = (item: Suscripcion) => {
+    setPayItem(item);
+  };
+
+  const confirmPay = async (metodo: 'SALDO' | 'CUENTA') => {
+    if (!payItem) return;
     const todayStr = new Date().toISOString().split('T')[0];
+
+    // Compute saldo if paying with SALDO
+    if (metodo === 'SALDO') {
+      const totalNetos = ingresos
+        .filter((i) => i.status === 'PAGADO')
+        .reduce((s, i) => s + convert(i.montoNeto, i.moneda), 0);
+      const totalGastos = gastos.reduce((s, g) => s + convert(g.monto, g.moneda), 0);
+      const saldoVirtual = totalNetos - totalGastos;
+      if (convert(payItem.monto, payItem.moneda) > saldoVirtual) {
+        toast.error('Saldo insuficiente en el SaaS');
+        return;
+      }
+    }
 
     try {
       // 1. Add record to expenses (Gastos)
+      const labelMetodo = metodo === 'SALDO' ? 'Saldo SaaS' : 'Cuenta Bancaria';
       await gastosService.add({
-        concepto: `Pago Suscripción: ${item.servicio}`,
-        monto: item.monto,
-        moneda: item.moneda,
+        concepto: `Pago Suscripción (${labelMetodo}): ${payItem.servicio}`,
+        monto: payItem.monto,
+        moneda: payItem.moneda,
         categoria: 'TECNOLOGIA_SAAS',
         esDeducible: true,
         esRecurrente: true,
-        fecha: todayStr
+        fecha: todayStr,
+        cantidad: 1,
+        igv: payItem.igv || 0
       });
 
       // 2. Advance the renewal date
-      const baseDate = item.proximaRenovacion || todayStr;
-      const nextDateStr = suscripcionesService.calcularProximaFecha(baseDate, item.ciclo);
-      await suscripcionesService.update(item.id, { proximaRenovacion: nextDateStr });
+      const baseDate = payItem.proximaRenovacion || todayStr;
+      const nextDateStr = suscripcionesService.calcularProximaFecha(baseDate, payItem.ciclo);
+      await suscripcionesService.update(payItem.id, { proximaRenovacion: nextDateStr });
 
-      toast.success(`Pago de "${item.servicio}" registrado en Gastos ✓`);
+      toast.success(`Pago de "${payItem.servicio}" registrado ✓`);
+      setPayItem(null);
       refresh();
     } catch (err) {
       console.error(err);
-      toast.error('Error al registrar el pago en Gastos');
+      toast.error('Error al registrar el pago');
     }
   };
 
@@ -223,8 +266,15 @@ export default function SuscripcionesPage() {
 
       {/* Modal — Create / Edit */}
       {modalOpen && (
-        <div className="fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          onClick={() => { setModalOpen(false); resetForm(); }}
+        >
+          <div className="flex items-center justify-center min-h-full p-4">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
                 <i className={`fas ${editId ? 'fa-edit text-blue-500' : 'fa-plus-circle text-[#4e73df]'}`} />
@@ -243,14 +293,20 @@ export default function SuscripcionesPage() {
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#4e73df]/30 focus:border-[#4e73df] text-sm transition" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="inputMonto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Costo</label>
                   <input id="inputMonto" type="number" required min="0.01" step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)}
                     placeholder="0.00"
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#4e73df]/30 focus:border-[#4e73df] text-sm transition" />
                 </div>
-                <div>
+                <div className="col-span-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">IGV ({igv}%) incl.</label>
+                  <p className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-sm text-[#4e73df] font-semibold">
+                    {moneda} {((parseFloat(monto) || 0) * (igv / (100 + igv))).toFixed(2)}
+                  </p>
+                </div>
+                <div className="col-span-1">
                   <label htmlFor="inputMonedaSub" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Moneda</label>
                   <select id="inputMonedaSub" value={moneda} onChange={(e) => setMoneda(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#4e73df]/30 focus:border-[#4e73df] text-sm bg-white transition">
@@ -293,6 +349,15 @@ export default function SuscripcionesPage() {
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#4e73df]/30 focus:border-[#4e73df] text-sm transition" />
               </div>
 
+              {usuario?.cuentaBancaria && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
+                  <i className="fas fa-info-circle mt-0.5 shrink-0 text-blue-500" />
+                  <p>
+                    <strong>Nota:</strong> Esta suscripción se cobrará de tu cuenta bancaria principal: <span className="font-bold">{usuario.cuentaBancaria}</span>.
+                  </p>
+                </div>
+              )}
+
               <button type="submit"
                 className={`w-full py-3 rounded-xl text-white font-bold transition flex items-center justify-center gap-2 text-sm ${editId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-[#4e73df] hover:bg-[#3d5fc9]'
                   }`}>
@@ -300,6 +365,71 @@ export default function SuscripcionesPage() {
                 {editId ? 'Guardar Cambios' : 'Guardar Suscripción'}
               </button>
             </form>
+          </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Pago ─────────────────────────────────────────────── */}
+      {payItem && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          onClick={() => setPayItem(null)}
+        >
+          <div className="flex items-center justify-center min-h-full p-4">
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-scale-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                  <i className="fas fa-credit-card text-[#4e73df]" /> Pagar Suscripción
+                </h5>
+                <button
+                  onClick={() => setPayItem(null)}
+                  className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition"
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                  <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-0.5">Servicio a pagar</p>
+                  <p className="text-lg font-bold text-blue-700">{payItem.servicio}</p>
+                  <p className="text-sm font-semibold text-blue-800 mt-1">{fmt(payItem.monto, payItem.moneda)}</p>
+                </div>
+                
+                <p className="text-xs text-gray-500 font-medium">Selecciona el origen de los fondos:</p>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={() => confirmPay('SALDO')}
+                    className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-[#4e73df] hover:bg-blue-50 transition flex gap-3 items-center"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-[#4e73df]/10 flex items-center justify-center shrink-0">
+                      <i className="fas fa-wallet text-[#4e73df]" />
+                    </div>
+                    <div>
+                      <h6 className="font-bold text-gray-800 text-sm">Saldo Virtual SaaS</h6>
+                      <p className="text-xs text-gray-500">Descuenta del saldo generado por ingresos</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => confirmPay('CUENTA')}
+                    className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-gray-800 hover:bg-gray-50 transition flex gap-3 items-center"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                      <i className="fas fa-university text-gray-600" />
+                    </div>
+                    <div>
+                      <h6 className="font-bold text-gray-800 text-sm">Cuenta Bancaria</h6>
+                      <p className="text-xs text-gray-500">{usuario?.cuentaBancaria || 'Cuenta externa principal'}</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

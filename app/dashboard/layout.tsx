@@ -61,7 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               sidebarCollapsed={sidebarCollapsed}
               onToggleSidebar={handleToggleSidebar}
               onLogout={logout}
-              userName={usuario.nombre}
+              userName={`${usuario.nombres} ${usuario.apellidoPaterno}`}
               userEmail={usuario.email}
             />
             {/* localStorage warning banner */}

@@ -7,7 +7,11 @@ import { authService } from '@/services/authService';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [nombre, setNombre] = useState('');
+  const [nombres, setNombres] = useState('');
+  const [apellidoPaterno, setApellidoPaterno] = useState('');
+  const [apellidoMaterno, setApellidoMaterno] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +22,7 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
     try {
-      await authService.register({ nombre, email, password });
+      await authService.register({ nombres, apellidoPaterno, apellidoMaterno, telefono, fechaNacimiento, email, password });
       router.push('/?registered=1');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al registrar. Intenta de nuevo.';
@@ -52,19 +56,42 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="nombre" className="block text-sm font-medium text-gray-300 mb-1.5">
-                Nombre Completo
-              </label>
-              <input
-                id="nombre"
-                type="text"
-                required
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej. Juan Pérez"
-                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1cc88a] focus:border-transparent transition"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label htmlFor="nombres" className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Nombres
+                </label>
+                <input id="nombres" type="text" required value={nombres} onChange={(e) => setNombres(e.target.value)}
+                  placeholder="Ej. Juan Carlos"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1cc88a] focus:border-transparent transition" />
+              </div>
+              
+              <div>
+                <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-300 mb-1.5">Apellido Paterno</label>
+                <input id="apellidoPaterno" type="text" required value={apellidoPaterno} onChange={(e) => setApellidoPaterno(e.target.value)}
+                  placeholder="Ej. Pérez"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1cc88a] focus:border-transparent transition" />
+              </div>
+
+              <div>
+                <label htmlFor="apellidoMaterno" className="block text-sm font-medium text-gray-300 mb-1.5">Apellido Materno</label>
+                <input id="apellidoMaterno" type="text" required value={apellidoMaterno} onChange={(e) => setApellidoMaterno(e.target.value)}
+                  placeholder="Ej. Gómez"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1cc88a] focus:border-transparent transition" />
+              </div>
+
+              <div>
+                <label htmlFor="telefono" className="block text-sm font-medium text-gray-300 mb-1.5">Teléfono</label>
+                <input id="telefono" type="tel" required value={telefono} onChange={(e) => setTelefono(e.target.value)}
+                  placeholder="Ej. +1 234 567 8900"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1cc88a] focus:border-transparent transition" />
+              </div>
+
+              <div>
+                <label htmlFor="fechaNacimiento" className="block text-sm font-medium text-gray-300 mb-1.5">Fecha Nacimiento</label>
+                <input id="fechaNacimiento" type="date" required value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1cc88a] focus:border-transparent transition" />
+              </div>
             </div>
 
             <div>

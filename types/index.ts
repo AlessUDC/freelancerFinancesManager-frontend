@@ -7,7 +7,12 @@ export interface PerfilFiscal {
 
 export interface Usuario {
   id: number;
-  nombre: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  telefono?: string;
+  fechaNacimiento?: string;
+  cuentaBancaria?: string;
   email: string;
   monedaBase?: string;          // 'USD', 'MXN', 'EUR', etc.
   zonaHoraria?: string;         // 'America/Mexico_City'
@@ -21,13 +26,22 @@ export interface LoginPayload {
 }
 
 export interface RegisterPayload {
-  nombre: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  telefono: string;
+  fechaNacimiento: string;
   email: string;
   password: string;
 }
 
 export interface UpdateUserPayload {
-  nombre: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  telefono?: string;
+  fechaNacimiento?: string;
+  cuentaBancaria?: string;
   email: string;
   password?: string;
   monedaBase?: string;
@@ -71,6 +85,7 @@ export interface Gasto {
   fecha: string;
   esRecurrente?: boolean;
   cantidad?: number;
+  igv?: number;
 }
 
 // ── Suscripciones ─────────────────────────────────────────────
@@ -85,4 +100,5 @@ export interface Suscripcion {
   ciclo: SuscripcionCiclo;
   proximaRenovacion: string;  // ISO 8601
   status: SuscripcionStatus;
+  igv?: number;
 }
