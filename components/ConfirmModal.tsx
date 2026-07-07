@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -8,7 +11,7 @@ interface ConfirmModalProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  intent?: 'danger' | 'primary' | 'warning';
+  intent?: 'danger' | 'primary' | 'warning' | 'success';
 }
 
 export function ConfirmModal({
@@ -21,22 +24,27 @@ export function ConfirmModal({
   cancelText = 'Cancelar',
   intent = 'danger',
 }: ConfirmModalProps) {
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!isOpen || !mounted) return null;
 
   const intentStyles = {
     danger: 'bg-red-500 hover:bg-red-600 focus:ring-red-500/30 text-white',
     warning: 'bg-amber-500 hover:bg-amber-600 focus:ring-amber-500/30 text-white',
     primary: 'bg-[#4e73df] hover:bg-[#2e59d9] focus:ring-[#4e73df]/30 text-white',
+    success: 'bg-[#1cc88a] hover:bg-[#17a874] focus:ring-[#1cc88a]/30 text-white',
   };
 
   const intentIcon = {
     danger: 'fas fa-exclamation-triangle text-red-500',
     warning: 'fas fa-exclamation-circle text-amber-500',
     primary: 'fas fa-info-circle text-[#4e73df]',
+    success: 'fas fa-check-circle text-[#1cc88a]',
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-3">
@@ -67,6 +75,7 @@ export function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

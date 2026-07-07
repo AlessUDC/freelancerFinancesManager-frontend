@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'react-toastify';
 import { StatCard } from '@/components/StatCard';
 import { suscripcionesService, gastosService, ingresosService } from '@/services/finanzasService';
@@ -29,6 +30,7 @@ export default function SuscripcionesPage() {
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  const [mounted, setMounted] = useState(false);
 
   // Pay Modal state
   const [payItem, setPayItem] = useState<Suscripcion | null>(null);
@@ -61,7 +63,10 @@ export default function SuscripcionesPage() {
     }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { 
+    refresh(); 
+    setMounted(true);
+  }, []);
 
   const resetForm = () => {
     setEditId(null);
@@ -265,9 +270,9 @@ export default function SuscripcionesPage() {
       </div>
 
       {/* Modal — Create / Edit */}
-      {modalOpen && (
+      {modalOpen && mounted && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm"
           onClick={() => { setModalOpen(false); resetForm(); }}
         >
           <div className="flex items-center justify-center min-h-full p-4">
@@ -367,13 +372,14 @@ export default function SuscripcionesPage() {
             </form>
           </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal de Pago ─────────────────────────────────────────────── */}
-      {payItem && (
+      {payItem && mounted && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm"
           onClick={() => setPayItem(null)}
         >
           <div className="flex items-center justify-center min-h-full p-4">
@@ -431,7 +437,8 @@ export default function SuscripcionesPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete Confirmation Modal */}
@@ -515,17 +522,14 @@ function SuscripcionesTable({
                 <td className="px-5 py-3.5 text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     <button
-                      onClick={() => !isPaid && onPay(item)}
-                      disabled={isPaid}
-                      title={isPaid ? "Ya pagado para este periodo" : "Registrar Pago"}
-                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1 ${isPaid
-                        ? 'bg-gray-400 text-white border-gray-400 opacity-50 cursor-not-allowed'
-                        : overdue
+                      onClick={() => onPay(item)}
+                      title="Registrar Pago"
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1 ${overdue
                           ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-500/10'
                           : 'bg-green-600 hover:bg-green-700 text-white border-green-600 shadow-sm shadow-green-500/10'
                         }`}
                     >
-                      <i className="fas fa-credit-card text-[10px]" /> {isPaid ? 'Pagado' : 'Pagar'}
+                      <i className="fas fa-credit-card text-[10px]" /> Pagar
                     </button>
                     <button onClick={() => onEdit(item)} title="Editar"
                       className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition">

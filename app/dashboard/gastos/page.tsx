@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { toast } from 'react-toastify';
 import { StatCard } from '@/components/StatCard';
@@ -85,10 +86,14 @@ export default function GastosPage() {
   // Delete Modal state
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
+  // Pay Gasto state
+  const [payGastoId, setPayGastoId] = useState<number | null>(null);
+
   // Retiro modal state
   const [retiroOpen, setRetiroOpen] = useState(false);
   const [montoRetiro, setMontoRetiro] = useState('');
   const [cuentaRetiro, setCuentaRetiro] = useState('');
+  const [mounted, setMounted] = useState(false);
 
   // Form State
   const [editId, setEditId] = useState<number | null>(null);
@@ -120,6 +125,7 @@ export default function GastosPage() {
 
   useEffect(() => {
     refresh();
+    setMounted(true);
     const storedUser = localStorage.getItem('usuario');
     if (storedUser) {
       try {
@@ -205,6 +211,23 @@ export default function GastosPage() {
     } catch (err) {
       console.error(err);
       toast.error('Error al eliminar el gasto');
+    }
+  };
+
+  const confirmPayGasto = async () => {
+    if (!payGastoId) return;
+    const item = gastos.find(g => g.id === payGastoId);
+    if (!item) return;
+    
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      await gastosService.update(payGastoId, { fecha: todayStr });
+      toast.success(`Pago de "${item.concepto}" registrado (fecha actualizada a hoy)`);
+      refresh();
+      setPayGastoId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al registrar pago');
     }
   };
 
@@ -420,18 +443,15 @@ export default function GastosPage() {
       <div className="fp-card p-5">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-              saldoVirtual >= 0 ? 'bg-green-100' : 'bg-red-100'
-            }`}>
-              <i className={`fas fa-wallet text-lg ${
-                saldoVirtual >= 0 ? 'text-green-600' : 'text-red-600'
-              }`} />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${saldoVirtual >= 0 ? 'bg-green-100' : 'bg-red-100'
+              }`}>
+              <i className={`fas fa-wallet text-lg ${saldoVirtual >= 0 ? 'text-green-600' : 'text-red-600'
+                }`} />
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Saldo Virtual SaaS</p>
-              <p className={`text-2xl font-bold ${
-                saldoVirtual >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
+              <p className={`text-2xl font-bold ${saldoVirtual >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
                 {saldoVirtual < 0 ? '−' : ''}{fmt(Math.abs(saldoVirtual))}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">
@@ -460,11 +480,10 @@ export default function GastosPage() {
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-700 ${
-                  saldoVirtual >= 0
-                    ? 'bg-gradient-to-r from-green-400 to-green-500'
-                    : 'bg-gradient-to-r from-red-400 to-red-500'
-                }`}
+                className={`h-full rounded-full transition-all duration-700 ${saldoVirtual >= 0
+                  ? 'bg-linear-to-r from-green-400 to-green-500'
+                  : 'bg-linear-to-r from-red-400 to-red-500'
+                  }`}
                 style={{ width: `${Math.min(100, (totalGastosSaldo / totalIngresosNetos) * 100)}%` }}
               />
             </div>
@@ -477,7 +496,7 @@ export default function GastosPage() {
         suscripciones={suscripciones}
         categoriaMeta={CATEGORIA_META}
         fmt={fmt}
-        onPagarGasto={openEditModal}
+        onPagarGasto={(gasto) => setPayGastoId(gasto.id)}
       />
 
       {/* Tabla */}
@@ -561,6 +580,12 @@ export default function GastosPage() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1">
+                          {item.fecha && item.fecha > new Date().toISOString().split('T')[0] && (
+                            <button onClick={() => setPayGastoId(item.id)}
+                              className="text-gray-300 hover:text-green-500 hover:bg-green-50 p-1.5 rounded-lg transition" title="Registrar Pago">
+                              <i className="fas fa-credit-card text-xs" />
+                            </button>
+                          )}
                           <button onClick={() => openEditModal(item)}
                             className="text-gray-300 hover:text-blue-500 hover:bg-blue-50 p-1.5 rounded-lg transition" title="Editar">
                             <i className="fas fa-edit text-xs" />
@@ -581,146 +606,147 @@ export default function GastosPage() {
       </div>
 
       {/* Modal Form */}
-      {modalOpen && (
+      {modalOpen && mounted && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm"
           onClick={() => { setModalOpen(false); resetForm(); }}
         >
           <div className="flex items-center justify-center min-h-full p-4">
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                <i className={`fas ${editId ? 'fa-edit' : 'fa-plus-circle'} text-[#e74a3b]`} /> {editId ? 'Editar Gasto' : 'Nuevo Gasto'}
-              </h5>
-              <button onClick={() => { setModalOpen(false); resetForm(); }}
-                className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition">
-                <i className="fas fa-times" />
-              </button>
-            </div>
-            <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
-              <div>
-                <label htmlFor="inputConcepto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Concepto</label>
-                <input id="inputConcepto" type="text" required value={concepto} onChange={(e) => setConcepto(e.target.value)}
-                  placeholder="Ej: Alquiler de oficina, internet, etc."
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+                <h5 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                  <i className={`fas ${editId ? 'fa-edit' : 'fa-plus-circle'} text-[#e74a3b]`} /> {editId ? 'Editar Gasto' : 'Nuevo Gasto'}
+                </h5>
+                <button onClick={() => { setModalOpen(false); resetForm(); }}
+                  className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition">
+                  <i className="fas fa-times" />
+                </button>
               </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
                 <div>
-                  <label htmlFor="inputCantidad" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Cantidad</label>
-                  <input id="inputCantidad" type="number" required min="1" step="1" value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}
+                  <label htmlFor="inputConcepto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Concepto</label>
+                  <input id="inputConcepto" type="text" required value={concepto} onChange={(e) => setConcepto(e.target.value)}
+                    placeholder="Ej: Alquiler de oficina, internet, etc."
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
                 </div>
-                <div>
-                  <label htmlFor="inputMonto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Monto Unit.</label>
-                  <input id="inputMonto" type="number" required min="0.01" step="0.01" value={montoUnitario} onChange={(e) => setMontoUnitario(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
-                </div>
-                <div>
-                  <label htmlFor="inputMonedaGasto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Moneda</label>
-                  <select id="inputMonedaGasto" value={moneda} onChange={(e) => setMoneda(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm bg-white transition">
-                    {MONEDAS_DISPONIBLES.map((m) => <option key={m.code} value={m.code}>{m.code}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">IGV ({igv}%) incluido</label>
-                  <p className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-sm text-[#e74a3b] font-semibold">
-                    {moneda} {((parseFloat(montoUnitario) || 0) * (igv / (100 + igv))).toFixed(2)}
-                  </p>
-                </div>
-              </div>
 
-              {/* Muestra visual de la equivalencia */}
-              {moneda !== baseCurrency && (
-                <p className="text-xs font-semibold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
-                  <i className="fas fa-info-circle mr-1" />
-                  Monto Total: {cantidad} x {moneda} {parseFloat(montoUnitario) || 0} = <span className="font-bold underline">{fmt(cantidad * (parseFloat(montoUnitario) || 0), moneda)}</span> equivalentes en {baseCurrency}
-                </p>
-              )}
-
-              {moneda === baseCurrency && (
-                <p className="text-xs font-medium text-gray-500 px-1">
-                  Monto Total: <span className="font-semibold text-gray-700">{moneda} {(cantidad * (parseFloat(montoUnitario) || 0)).toFixed(2)}</span>
-                </p>
-              )}
-
-              <div>
-                <label htmlFor="inputCategoria" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Categoría</label>
-                <select id="inputCategoria" value={categoria} onChange={(e) => setCategoria(e.target.value as GastoCategoria)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm bg-white transition">
-                  {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_META[c].label}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="inputFechaGasto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Fecha</label>
-                <input id="inputFechaGasto" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
-              </div>
-
-              <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-3">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Configuración del Gasto</p>
-
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={esRecurrente} onChange={(e) => setEsRecurrente(e.target.checked)}
-                    className="w-4 h-4 rounded accent-amber-500" />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <span className="text-sm font-medium text-gray-700">¿Es un Gasto Fijo / Recurrente?</span>
-                    <p className="text-xs text-gray-400">Se repite de forma mensual (ej: Coworking, Internet, etc.)</p>
+                    <label htmlFor="inputCantidad" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Cantidad</label>
+                    <input id="inputCantidad" type="number" required min="1" step="1" value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
                   </div>
-                </label>
-
-                <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200/60 bg-white">
                   <div>
-                    <span className="text-sm font-semibold text-gray-700">¿Es Gasto Deducible?</span>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {esDeducible
-                        ? 'Sí · Vinculado al negocio (ej. hosting, herramientas)'
-                        : 'No · Gasto personal (ej. almuerzo, café)'}
+                    <label htmlFor="inputMonto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Monto Unit.</label>
+                    <input id="inputMonto" type="number" required min="0.01" step="0.01" value={montoUnitario} onChange={(e) => setMontoUnitario(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
+                  </div>
+                  <div>
+                    <label htmlFor="inputMonedaGasto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Moneda</label>
+                    <select id="inputMonedaGasto" value={moneda} onChange={(e) => setMoneda(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm bg-white transition">
+                      {MONEDAS_DISPONIBLES.map((m) => <option key={m.code} value={m.code}>{m.code}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">IGV ({igv}%) incluido</label>
+                    <p className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-sm text-[#e74a3b] font-semibold">
+                      {moneda} {((parseFloat(montoUnitario) || 0) * (igv / (100 + igv))).toFixed(2)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setEsDeducible(!esDeducible)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${esDeducible ? 'bg-[#1cc88a]' : 'bg-gray-300'
-                      }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${esDeducible ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                    />
-                  </button>
                 </div>
-              </div>
 
-              {usuario?.cuentaBancaria && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
-                  <i className="fas fa-info-circle mt-0.5 shrink-0 text-blue-500" />
-                  <p>
-                    <strong>Nota:</strong> Este gasto se registrará usando tu cuenta bancaria principal: <span className="font-bold">{usuario.cuentaBancaria}</span>.
+                {/* Muestra visual de la equivalencia */}
+                {moneda !== baseCurrency && (
+                  <p className="text-xs font-semibold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
+                    <i className="fas fa-info-circle mr-1" />
+                    Monto Total: {cantidad} x {moneda} {parseFloat(montoUnitario) || 0} = <span className="font-bold underline">{fmt(cantidad * (parseFloat(montoUnitario) || 0), moneda)}</span> equivalentes en {baseCurrency}
                   </p>
-                </div>
-              )}
+                )}
 
-              <button type="submit"
-                className="w-full py-3 rounded-xl bg-[#e74a3b] hover:bg-[#c0392b] text-white font-bold transition flex items-center justify-center gap-2 text-sm">
-                <i className="fas fa-check" /> Guardar Gasto
-              </button>
-            </form>
+                {moneda === baseCurrency && (
+                  <p className="text-xs font-medium text-gray-500 px-1">
+                    Monto Total: <span className="font-semibold text-gray-700">{moneda} {(cantidad * (parseFloat(montoUnitario) || 0)).toFixed(2)}</span>
+                  </p>
+                )}
+
+                <div>
+                  <label htmlFor="inputCategoria" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Categoría</label>
+                  <select id="inputCategoria" value={categoria} onChange={(e) => setCategoria(e.target.value as GastoCategoria)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm bg-white transition">
+                    {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_META[c].label}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="inputFechaGasto" className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Fecha</label>
+                  <input id="inputFechaGasto" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#e74a3b]/30 focus:border-[#e74a3b] text-sm transition" />
+                </div>
+
+                <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Configuración del Gasto</p>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={esRecurrente} onChange={(e) => setEsRecurrente(e.target.checked)}
+                      className="w-4 h-4 rounded accent-amber-500" />
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">¿Es un Gasto Fijo / Recurrente?</span>
+                      <p className="text-xs text-gray-400">Se repite de forma mensual (ej: Coworking, Internet, etc.)</p>
+                    </div>
+                  </label>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200/60 bg-white">
+                    <div>
+                      <span className="text-sm font-semibold text-gray-700">¿Es Gasto Deducible?</span>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {esDeducible
+                          ? 'Sí · Vinculado al negocio (ej. hosting, herramientas)'
+                          : 'No · Gasto personal (ej. almuerzo, café)'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEsDeducible(!esDeducible)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${esDeducible ? 'bg-[#1cc88a]' : 'bg-gray-300'
+                        }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${esDeducible ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {usuario?.cuentaBancaria && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
+                    <i className="fas fa-info-circle mt-0.5 shrink-0 text-blue-500" />
+                    <p>
+                      <strong>Nota:</strong> Este gasto se registrará usando tu cuenta bancaria principal: <span className="font-bold">{usuario.cuentaBancaria}</span>.
+                    </p>
+                  </div>
+                )}
+
+                <button type="submit"
+                  className="w-full py-3 rounded-xl bg-[#e74a3b] hover:bg-[#c0392b] text-white font-bold transition flex items-center justify-center gap-2 text-sm">
+                  <i className="fas fa-check" /> Guardar Gasto
+                </button>
+              </form>
+            </div>
           </div>
-          </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal de Retiro ─────────────────────────────────────────────── */}
-      {retiroOpen && (
+      {retiroOpen && mounted && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm"
           onClick={() => setRetiroOpen(false)}
         >
           <div className="flex items-center justify-center min-h-full p-4">
@@ -780,7 +806,8 @@ export default function GastosPage() {
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete Confirmation Modal */}
@@ -789,9 +816,20 @@ export default function GastosPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={confirmDelete}
         title="Eliminar Gasto"
-        message="¿Estás seguro que deseas eliminar este gasto de tu historial? Esta acción no se puede deshacer y afectará tu balance e impuestos."
+        message="¿Estás seguro de que deseas eliminar este gasto de tu registro?"
         confirmText="Eliminar"
         intent="danger"
+      />
+
+      {/* Pay Confirmation Modal */}
+      <ConfirmModal
+        isOpen={payGastoId !== null}
+        onClose={() => setPayGastoId(null)}
+        onConfirm={confirmPayGasto}
+        title="Registrar Pago de Gasto"
+        message="¿Confirmas que deseas registrar el pago de este gasto? Su fecha se actualizará a hoy."
+        confirmText="Confirmar Pago"
+        intent="success"
       />
     </div>
   );

@@ -103,15 +103,6 @@ export function Navbar({
 
       {/* ── Right: dark mode toggle + user dropdown ── */}
       <div className="flex items-center gap-2">
-        {/* Dark / Light mode toggle (prototype) */}
-        <button
-          id="btnDarkMode"
-          onClick={() => setDarkMode((d) => !d)}
-          title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
-        >
-          {darkMode ? <SunIcon /> : <MoonIcon />}
-        </button>
 
         {/* User dropdown */}
         <div className="relative" ref={dropdownRef}>

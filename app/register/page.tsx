@@ -33,7 +33,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#1a1c23] via-[#2c2f3f] to-[#1a1c23] flex items-center justify-center p-4">
+    <main className="min-h-screen bg-linear-to-br from-[#1a1c23] via-[#2c2f3f] to-[#1a1c23] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -65,7 +65,7 @@ export default function RegisterPage() {
                   placeholder="Ej. Juan Carlos"
                   className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1cc88a] focus:border-transparent transition" />
               </div>
-              
+
               <div>
                 <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-300 mb-1.5">Apellido Paterno</label>
                 <input id="apellidoPaterno" type="text" required value={apellidoPaterno} onChange={(e) => setApellidoPaterno(e.target.value)}

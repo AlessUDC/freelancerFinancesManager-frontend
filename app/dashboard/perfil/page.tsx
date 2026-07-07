@@ -6,14 +6,14 @@ import { authService } from '@/services/authService';
 
 export default function PerfilPage() {
   const { usuario } = useAuth();
-  
+
   const [nombres, setNombres] = useState('');
   const [apellidoPaterno, setApellidoPaterno] = useState('');
   const [apellidoMaterno, setApellidoMaterno] = useState('');
   const [telefono, setTelefono] = useState('');
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [cuentaBancaria, setCuentaBancaria] = useState('');
-  
+
   // Perfil Fiscal
   const [razonSocial, setRazonSocial] = useState('');
   const [rucNif, setRucNif] = useState('');
@@ -86,7 +86,7 @@ export default function PerfilPage() {
           <i className="fas fa-check-circle" /> Datos actualizados correctamente.
         </div>
       )}
-      
+
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-center gap-2">
           <i className="fas fa-exclamation-triangle" /> {error}
@@ -180,7 +180,7 @@ export default function PerfilPage() {
         form="perfil-form"
         type="submit"
         disabled={loading}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#4e73df] hover:bg-[#3d5fc9] text-white font-bold px-6 py-3 rounded-full shadow-lg shadow-blue-500/40 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#4e73df] hover:bg-[#3d5fc9] text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-blue-500/40 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <i className={loading ? "fas fa-spinner fa-spin text-lg" : "fas fa-save text-lg"} />
         <span className="hidden sm:inline">{loading ? 'Guardando...' : 'Guardar Perfil'}</span>

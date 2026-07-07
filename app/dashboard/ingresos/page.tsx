@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'react-toastify';
 import { StatCard } from '@/components/StatCard';
 import { ingresosService } from '@/services/finanzasService';
@@ -37,7 +38,10 @@ export default function IngresosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
+  const [payIngresoId, setPayIngresoId] = useState<number | null>(null);
+
   const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Form State
   const [editId, setEditId] = useState<number | null>(null);
@@ -65,6 +69,7 @@ export default function IngresosPage() {
   };
 
   useEffect(() => {
+    setMounted(true);
     const storedUser = localStorage.getItem('usuario');
     if (storedUser) {
       try {
@@ -175,6 +180,27 @@ export default function IngresosPage() {
     } catch (err) {
       console.error(err);
       toast.error('Error al actualizar el estado');
+    }
+  };
+
+  const confirmPayIngreso = async () => {
+    if (!payIngresoId) return;
+    const item = ingresos.find(i => i.id === payIngresoId);
+    if (!item) return;
+    
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      await ingresosService.update(payIngresoId, { 
+        ...item, 
+        status: 'PAGADO',
+        fecha: todayStr
+      });
+      toast.success(`Cobro de "${item.proyectoNombre}" registrado exitosamente`);
+      await refresh();
+      setPayIngresoId(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al registrar cobro');
     }
   };
 
@@ -363,9 +389,9 @@ export default function IngresosPage() {
                       </td>
                       <td className="px-5 py-3.5 text-right whitespace-nowrap">
                         {item.computedStatus !== 'PAGADO' && (
-                          <button onClick={() => handleStatusChange(item, 'PAGADO')}
-                            className="text-gray-400 hover:text-green-500 hover:bg-green-50 p-1.5 rounded-lg transition mr-1" title="Marcar como pagado">
-                            <i className="fas fa-check text-xs" />
+                          <button onClick={() => setPayIngresoId(item.id)}
+                            className="text-white bg-green-500 hover:bg-green-600 px-2 py-1.5 rounded-lg text-xs font-semibold transition mr-1 shadow-sm shadow-green-500/20" title="Cobrar (Marcar como Pagado)">
+                            <i className="fas fa-hand-holding-usd mr-1" /> Cobrar
                           </button>
                         )}
                         <button onClick={() => openEditModal(item)}
@@ -387,9 +413,9 @@ export default function IngresosPage() {
       </div>
 
       {/* Modal */}
-      {modalOpen && (
+      {modalOpen && mounted && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
           onClick={() => { setModalOpen(false); resetForm(); }}
         >
           <div
@@ -496,7 +522,8 @@ export default function IngresosPage() {
               </button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {/* Delete Confirmation Modal */}
       <ConfirmModal
@@ -504,9 +531,20 @@ export default function IngresosPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={confirmDelete}
         title="Eliminar Ingreso"
-        message="¿Estás seguro de que deseas eliminar este ingreso? Tu balance general e impuestos calculados se verán afectados."
+        message="¿Estás seguro de que deseas eliminar este ingreso? Esta acción no se puede deshacer."
         confirmText="Eliminar"
         intent="danger"
+      />
+
+      {/* Pay/Cobrar Confirmation Modal */}
+      <ConfirmModal
+        isOpen={payIngresoId !== null}
+        onClose={() => setPayIngresoId(null)}
+        onConfirm={confirmPayIngreso}
+        title="Confirmar Cobro"
+        message="¿Confirmas que deseas marcar este ingreso como Cobrado (Pagado)? Su fecha de pago se actualizará a hoy."
+        confirmText="Confirmar Cobro"
+        intent="success"
       />
     </div>
   );

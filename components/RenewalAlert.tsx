@@ -16,7 +16,7 @@ export function RenewalAlert({ suscripciones }: RenewalAlertProps) {
 
   return (
     <div className="mb-5 animate-fade-in">
-      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl overflow-hidden">
+      <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-3 bg-amber-100/60 border-b border-amber-200">
           <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center shadow-sm">
@@ -45,9 +45,8 @@ export function RenewalAlert({ suscripciones }: RenewalAlertProps) {
             const isUrgent = days <= 3;
             return (
               <div key={s.id} className="flex items-center gap-4 px-5 py-3 hover:bg-amber-50/50 transition">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
-                  isUrgent ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'
-                }`}>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${isUrgent ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'
+                  }`}>
                   {days}d
                 </div>
                 <div className="flex-1 min-w-0">
@@ -58,9 +57,8 @@ export function RenewalAlert({ suscripciones }: RenewalAlertProps) {
                   <p className={`text-sm font-bold ${isUrgent ? 'text-red-600' : 'text-gray-700'}`}>
                     {fmt(s.monto, s.moneda)}
                   </p>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                    s.ciclo === 'ANUAL' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'
-                  }`}>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.ciclo === 'ANUAL' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'
+                    }`}>
                     {s.ciclo}
                   </span>
                 </div>

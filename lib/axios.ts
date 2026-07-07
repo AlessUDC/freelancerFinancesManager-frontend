@@ -32,7 +32,7 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
         localStorage.removeItem('usuario');
         window.location.href = '/';
-        return new Promise(() => {}); // silenciar el error mientras redirige
+        return new Promise(() => { }); // silenciar el error mientras redirige
       }
     }
     return Promise.reject(error);
